@@ -1,0 +1,58 @@
+name: l_bracket
+category: assembly
+purpose: "Right-angle bracket formed by two perpendicular flat legs of equal material thickness."
+
+when_to_use: >-
+  A structural bracket connecting two perpendicular planes. Used for motor
+  mounts, frame corners, sensor brackets, and panel supports. Both legs share
+  the same wall thickness.
+
+idiom: |
+  # Extrude an L-shaped profile in the XZ plane along Y
+  (cq.Workplane("XZ")
+      .polyline([
+          (0, 0), (leg_w, 0), (leg_w, wall_t),
+          (wall_t, wall_t), (wall_t, leg_h), (0, leg_h),
+      ])
+      .close()
+      .extrude(length))
+
+avoid:
+  - "Building two separate .box() solids and trying to union them -- profile extrusion is simpler and more robust"
+  - "Forgetting .close() after .polyline() -- leaves an open wire that cannot be extruded"
+  - "Using the XY plane for an L profile that needs a Z component -- XZ or YZ is correct"
+
+parameters:
+  leg_w:  {type: float, unit: mm, description: "Width of the horizontal leg"}
+  leg_h:  {type: float, unit: mm, description: "Height of the vertical leg"}
+  wall_t: {type: float, unit: mm, description: "Material thickness (both legs)"}
+  length: {type: float, unit: mm, description: "Extrusion length (bracket depth)"}
+
+example: |
+  import cadquery as cq
+
+
+  def build_model():
+      leg_w  = 50.0
+      leg_h  = 40.0
+      wall_t =  5.0
+      length = 60.0
+
+      return (
+          cq.Workplane("XZ")
+          .polyline([
+              (0,      0),
+              (leg_w,  0),
+              (leg_w,  wall_t),
+              (wall_t, wall_t),
+              (wall_t, leg_h),
+              (0,      leg_h),
+          ])
+          .close()
+          .extrude(length)
+      )
+
+repair_hints:
+  - "Cannot extrude open wire: ensure .close() immediately follows .polyline()."
+  - "Extrusion in wrong direction: swap the plane argument ('XZ' vs 'YZ') or use .extrude(-length)."
+  - "To add mounting holes: chain .faces('>Y').workplane().pushPoints([...]).hole(d) after extrusion."

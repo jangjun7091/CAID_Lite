@@ -1,0 +1,42 @@
+name: blind_hole
+category: feature
+purpose: "Circular hole terminating at a specified depth without penetrating the opposite face."
+
+when_to_use: >-
+  A tapped or press-fit hole that must not break through. Common for threaded
+  inserts, counterbored pockets, and stepped cavities in thicker parts.
+
+idiom: |
+  .faces(">Z").workplane().hole(diameter, depth)
+
+avoid:
+  - "Omitting depth -- .hole(d) without depth creates a through-hole"
+  - ".circle(r).cutBlind(-depth) for a simple round blind hole -- .hole(d, depth) is simpler"
+  - "depth >= part thickness -- produces a through-hole or geometry failure"
+
+parameters:
+  diameter: {type: float, unit: mm, description: "Hole diameter"}
+  depth:    {type: float, unit: mm, description: "Hole depth (must be strictly less than part thickness)"}
+
+example: |
+  import cadquery as cq
+
+
+  def build_model():
+      width    = 50.0
+      height   = 50.0
+      thick    = 20.0
+      hole_d   =  8.0
+      hole_dep = 12.0  # 8 mm of material remains at bottom
+
+      return (
+          cq.Workplane("XY")
+          .box(width, height, thick)
+          .faces(">Z").workplane()
+          .hole(hole_d, hole_dep)
+      )
+
+repair_hints:
+  - "Hole goes through: .hole(diameter, depth) requires depth as the second positional argument."
+  - "depth > thickness causes a geometry failure; ensure depth < part thickness."
+  - "For a counterbore: call .hole(cbore_d, cbore_depth) then .hole(thru_d) in sequence."

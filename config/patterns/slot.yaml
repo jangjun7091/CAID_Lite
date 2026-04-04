@@ -1,0 +1,51 @@
+name: slot
+category: feature
+purpose: "Elongated cut with rounded or square ends for positional adjustment, keyways, or clearance."
+
+when_to_use: >-
+  A fastener adjustment slot, keyway, or any cut that is significantly longer
+  than it is wide on a planar face. Use the rounded variant for clearance slots,
+  the rectangular variant for keyways and square-cornered features.
+
+idiom: |
+  # Rounded-end slot (preferred for clearance and adjustment slots)
+  .faces(">Z").workplane().slot2D(length, width).cutThruAll()
+
+  # Sharp-cornered slot (keyway, square pocket cut)
+  .faces(">Z").workplane().rect(length, width).cutThruAll()
+
+  # Blind slot
+  .faces(">Z").workplane().slot2D(length, width).cutBlind(-depth)
+
+avoid:
+  - ".hole() for a slot -- .hole() creates only circular holes"
+  - ".eachpoint() for slot positioning -- use .center(x, y) before .slot2D() instead"
+
+parameters:
+  length: {type: float, unit: mm, description: "Long dimension of slot"}
+  width:  {type: float, unit: mm, description: "Short dimension (also the end-cap diameter for slot2D)"}
+  depth:  {type: float, unit: mm, description: "Cut depth for blind variant (omit for through-slot)"}
+
+example: |
+  import cadquery as cq
+
+
+  def build_model():
+      width    = 80.0
+      height   = 40.0
+      thick    =  6.0
+      slot_len = 30.0
+      slot_w   =  8.0
+
+      return (
+          cq.Workplane("XY")
+          .box(width, height, thick)
+          .faces(">Z").workplane()
+          .slot2D(slot_len, slot_w)
+          .cutThruAll()
+      )
+
+repair_hints:
+  - "slot2D(length, diameter): the second arg is the full slot width, not the radius."
+  - "Wrong orientation: rotate with .slot2D(length, width, angle=90) or swap length/width."
+  - "For an offset slot: use .center(x, y) before .slot2D() to shift from the face centre."

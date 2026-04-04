@@ -1,0 +1,50 @@
+name: hole_rarray
+category: feature
+purpose: "Uniform rectangular grid of identically sized holes using the built-in repeat array."
+
+when_to_use: >-
+  Holes are arranged in a regular N x M grid with equal centre-to-centre spacing
+  in X and Y. Prefer over pushPoints when the pattern is truly uniform and the
+  grid counts and spacings are easier to specify than individual coordinates.
+
+idiom: |
+  .faces(">Z").workplane()
+  .rarray(x_spacing, y_spacing, n_cols, n_rows)
+  .hole(diameter)
+
+avoid:
+  - "Computing grid positions manually with pushPoints when the pattern is regular -- rarray is cleaner"
+  - "Passing 0 for n_cols or n_rows -- minimum count is 1"
+  - ".eachpoint() for grid holes -- always prefer .rarray().hole()"
+
+parameters:
+  x_spacing: {type: float, unit: mm, description: "Centre-to-centre distance in the X direction"}
+  y_spacing: {type: float, unit: mm, description: "Centre-to-centre distance in the Y direction"}
+  n_cols:    {type: int,   unit: "-", description: "Number of columns (along X)"}
+  n_rows:    {type: int,   unit: "-", description: "Number of rows (along Y)"}
+  diameter:  {type: float, unit: mm, description: "Hole diameter"}
+
+example: |
+  import cadquery as cq
+
+
+  def build_model():
+      width  = 120.0
+      height =  80.0
+      thick  =   8.0
+      hole_d =   6.0
+      x_sp   =  30.0
+      y_sp   =  25.0
+
+      return (
+          cq.Workplane("XY")
+          .box(width, height, thick)
+          .faces(">Z").workplane()
+          .rarray(x_sp, y_sp, 3, 2)
+          .hole(hole_d)
+      )
+
+repair_hints:
+  - "Grid is offset from face centre: rarray centres the grid on the workplane origin by default."
+  - "Wrong hole count: n_cols and n_rows must be integers; verify they are not accidentally floats."
+  - "Non-uniform spacing or irregular positions: use pushPoints with explicit coordinates instead."

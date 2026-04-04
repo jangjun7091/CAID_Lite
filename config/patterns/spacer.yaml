@@ -1,0 +1,45 @@
+name: spacer
+category: assembly
+purpose: "Short cylindrical standoff with a central clearance bore for separating components along a fastener."
+
+when_to_use: >-
+  Two components must be axially separated along a fastener shaft. The spacer's
+  outer diameter provides a bearing face; the bore provides fastener clearance.
+  Use tube pattern for longer pipe-like spacers.
+
+idiom: |
+  (cq.Workplane("XY")
+      .cylinder(height, outer_r)
+      .faces(">Z").workplane()
+      .hole(bore_d))
+
+avoid:
+  - "bore_d >= 2 * outer_r -- no wall material remains"
+  - ".shell() for the bore -- unreliable on cylinders; always use .hole() instead"
+  - "Wall thickness < 1.5 mm for FDM-printed spacers -- minimum wall for reliable printing"
+
+parameters:
+  height:  {type: float, unit: mm, description: "Spacer length (axial)"}
+  outer_r: {type: float, unit: mm, description: "Outer radius"}
+  bore_d:  {type: float, unit: mm, description: "Fastener clearance bore diameter"}
+
+example: |
+  import cadquery as cq
+
+
+  def build_model():
+      height  = 15.0
+      outer_r =  8.0
+      bore_d  =  5.5  # M5 fastener clearance
+
+      return (
+          cq.Workplane("XY")
+          .cylinder(height, outer_r)
+          .faces(">Z").workplane()
+          .hole(bore_d)
+      )
+
+repair_hints:
+  - "Wall too thin: wall = outer_r - bore_d/2 must be positive; verify bore_d < 2 * outer_r."
+  - "For a hex spacer body: replace .cylinder() with a hexagonal polyline profile + .extrude()."
+  - "For lead-in chamfer on ends: chain .edges('<Z').chamfer(0.5) at the end of the build."

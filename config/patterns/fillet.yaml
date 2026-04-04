@@ -1,0 +1,44 @@
+name: fillet
+category: feature
+purpose: "Convex rounded edge treatment to reduce stress concentration and soften corners."
+
+when_to_use: >-
+  Edges need rounding for stress relief, printability, or appearance. Apply
+  after the primary solid and all cuts are complete; fillets are the last
+  feature in a chain.
+
+idiom: |
+  result.edges("|Z").fillet(radius)   # vertical corner edges (parallel to Z)
+  result.edges(">Z").fillet(radius)   # top-face perimeter edges
+  result.edges("<Z").fillet(radius)   # bottom-face perimeter edges
+  result.edges().fillet(radius)       # all edges (use with caution)
+
+avoid:
+  - "Applying .fillet() before holes, pockets, or bosses are complete -- causes edge-selection failures"
+  - "radius >= half the thinnest adjacent wall -- OCC will reject the geometry"
+  - "Filleting every edge at once when only specific edges need treatment"
+
+parameters:
+  radius: {type: float, unit: mm, description: "Fillet radius; must be less than half the minimum adjacent wall thickness"}
+
+example: |
+  import cadquery as cq
+
+
+  def build_model():
+      width  = 80.0
+      height = 50.0
+      thick  =  8.0
+      r      =  3.0
+
+      return (
+          cq.Workplane("XY")
+          .box(width, height, thick)
+          .edges("|Z")
+          .fillet(r)
+      )
+
+repair_hints:
+  - "Geometry error: radius is too large; reduce it or select fewer edges."
+  - "Wrong edges rounded: use a more specific selector '>Z', '<Z', '|X', or '#Z'."
+  - "Fillet must come last -- add all holes, pockets, and bosses before calling .fillet()."

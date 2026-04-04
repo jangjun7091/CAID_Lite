@@ -1,0 +1,44 @@
+name: tube
+category: solid
+purpose: "Hollow cylinder with a concentric through-bore; used for pipes, sleeves, and bushings."
+
+when_to_use: >-
+  The part is a cylindrical shell: a solid outer surface with a coaxial axial
+  bore. Typical for spacers, bushings, pipe sections, and sleeve bearings.
+
+idiom: |
+  (cq.Workplane("XY")
+      .cylinder(height, outer_r)
+      .faces(">Z").workplane()
+      .hole(bore_d))
+
+avoid:
+  - ".circle(outer_r).circle(inner_r).extrude(h) -- cannot extrude an annular region this way"
+  - ".shell() on a cylinder for bore creation -- unreliable; use .hole() instead"
+  - "bore_d >= 2 * outer_r -- eliminates all wall material"
+
+parameters:
+  height:  {type: float, unit: mm, description: "Axial length"}
+  outer_r: {type: float, unit: mm, description: "Outer radius"}
+  bore_d:  {type: float, unit: mm, description: "Inner bore diameter (must be < 2 * outer_r)"}
+
+example: |
+  import cadquery as cq
+
+
+  def build_model():
+      height  = 30.0
+      outer_r = 20.0
+      bore_d  = 25.0  # wall thickness = outer_r - bore_d/2 = 7.5 mm
+
+      return (
+          cq.Workplane("XY")
+          .cylinder(height, outer_r)
+          .faces(">Z").workplane()
+          .hole(bore_d)
+      )
+
+repair_hints:
+  - "Empty solid: verify bore_d < 2 * outer_r (bore diameter must be less than outer diameter)."
+  - "Hole on wrong axis: confirm .faces('>Z').workplane() selects the top face before .hole()."
+  - "For a stepped bore (shoulder), call .hole(d1, depth1) then .faces('>Z').workplane().hole(d2)."

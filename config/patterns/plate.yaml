@@ -1,0 +1,36 @@
+name: plate
+category: solid
+purpose: "Flat rectangular slab; the base body for brackets, panels, and mounting plates."
+
+when_to_use: >-
+  Use when the geometry is a uniform-thickness flat slab. Typically the first
+  solid in a build before holes, pockets, or edge features are added.
+
+idiom: |
+  cq.Workplane("XY").box(width, height, thickness)
+
+avoid:
+  - ".rect(width, height).extrude(thickness) -- verbose; prefer .box()"
+  - "Adding features without first selecting a face: always follow with .faces('>Z').workplane()"
+  - "Confusing argument order -- .box(x, y, z) not (thickness, width, height)"
+
+parameters:
+  width:     {type: float, unit: mm, description: "X dimension"}
+  height:    {type: float, unit: mm, description: "Y dimension"}
+  thickness: {type: float, unit: mm, description: "Z dimension (material thickness)"}
+
+example: |
+  import cadquery as cq
+
+
+  def build_model():
+      width     = 100.0
+      height    =  60.0
+      thickness =   6.0
+
+      return cq.Workplane("XY").box(width, height, thickness)
+
+repair_hints:
+  - "Follow-on feature fails: add .faces('>Z').workplane() after .box() before the next operation."
+  - "Wrong orientation: verify the Workplane plane argument ('XY', 'XZ', 'YZ') matches design intent."
+  - "Dimension mismatch: .box(width, height, thickness) maps to X, Y, Z respectively."

@@ -1,0 +1,57 @@
+name: flange
+category: assembly
+purpose: "Circular disc with a central bore and an evenly spaced bolt circle for pipe or shaft connection."
+
+when_to_use: >-
+  Connecting two pipes, shafts, or assemblies with a bolted circular interface.
+  Defined by flange outer diameter, central bore, bolt-circle pitch-circle
+  diameter, bolt count, and bolt hole diameter.
+
+idiom: |
+  (cq.Workplane("XY")
+      .cylinder(thickness, flange_r)
+      .faces(">Z").workplane()
+      .polarArray(bolt_pcd_r, 0, 360, n_bolts)
+      .hole(bolt_d)
+      .faces(">Z").workplane()
+      .hole(bore_d))
+
+avoid:
+  - "Computing bolt positions manually with math.cos/sin + pushPoints when spacing is uniform -- polarArray is cleaner"
+  - "bore_d >= 2 * flange_r -- no flange material remains"
+  - "bolt holes overlapping the bore: ensure bolt_pcd_r > (bore_d/2 + bolt_d/2)"
+
+parameters:
+  flange_r:   {type: float, unit: mm, description: "Flange outer radius"}
+  thickness:  {type: float, unit: mm, description: "Flange disc thickness"}
+  bore_d:     {type: float, unit: mm, description: "Central bore diameter (shaft or pipe clearance)"}
+  bolt_pcd_r: {type: float, unit: mm, description: "Bolt-circle pitch-circle radius"}
+  bolt_d:     {type: float, unit: mm, description: "Bolt hole diameter"}
+  n_bolts:    {type: int,   unit: "-", description: "Number of equally spaced bolt holes"}
+
+example: |
+  import cadquery as cq
+
+
+  def build_model():
+      flange_r   = 45.0
+      thickness  = 12.0
+      bore_d     = 25.0
+      bolt_pcd_r = 32.0
+      bolt_d     =  8.0
+      n_bolts    =  6
+
+      return (
+          cq.Workplane("XY")
+          .cylinder(thickness, flange_r)
+          .faces(">Z").workplane()
+          .polarArray(bolt_pcd_r, 0, 360, n_bolts)
+          .hole(bolt_d)
+          .faces(">Z").workplane()
+          .hole(bore_d)
+      )
+
+repair_hints:
+  - "polarArray(radius, startAngle, totalAngle, count): first arg is radius not diameter."
+  - "Bolt holes overlap bore: increase bolt_pcd_r or reduce bolt_d and bore_d."
+  - "For non-uniform bolt spacing: replace .polarArray() with .pushPoints([(x,y), ...])."

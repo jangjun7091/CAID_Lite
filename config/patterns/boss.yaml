@@ -1,0 +1,52 @@
+name: boss
+category: feature
+purpose: "Raised cylindrical protrusion on a face for alignment pins, press-fit seats, or threaded standoffs."
+
+when_to_use: >-
+  A cylindrical feature projects above a face to mate with a bore, provide a
+  tapped boss, or act as a locating pin. Often combined with a central bore.
+
+idiom: |
+  # Solid boss
+  .faces(">Z").workplane().circle(boss_r).extrude(boss_h)
+
+  # Boss with central through-bore
+  .faces(">Z").workplane().circle(boss_r).extrude(boss_h)
+  .faces(">Z").workplane().hole(bore_d)
+
+avoid:
+  - ".cylinder() called on a face workplane -- it does not attach to the face; use .circle().extrude()"
+  - "Placing the boss before selecting the correct face with .faces().workplane()"
+  - "bore_d >= 2 * boss_r -- removes all boss wall material"
+
+parameters:
+  boss_r: {type: float, unit: mm, description: "Boss outer radius"}
+  boss_h: {type: float, unit: mm, description: "Boss height above parent face"}
+  bore_d: {type: float, unit: mm, description: "Central bore diameter (optional; omit for solid boss)"}
+
+example: |
+  import cadquery as cq
+
+
+  def build_model():
+      plate_w = 80.0
+      plate_h = 60.0
+      plate_t  =  8.0
+      boss_r  = 12.0
+      boss_h  = 10.0
+      bore_d  = 10.0
+
+      return (
+          cq.Workplane("XY")
+          .box(plate_w, plate_h, plate_t)
+          .faces(">Z").workplane()
+          .circle(boss_r)
+          .extrude(boss_h)
+          .faces(">Z").workplane()
+          .hole(bore_d)
+      )
+
+repair_hints:
+  - "Boss appears detached: confirm .faces('>Z').workplane() is called on the parent solid face."
+  - "Extrude in wrong direction: .extrude(h) extends along the current workplane normal (+Z by default)."
+  - "For an offset boss: insert .center(x, y) between .workplane() and .circle()."

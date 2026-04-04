@@ -1,0 +1,54 @@
+name: hole_pushpoints
+category: feature
+purpose: "Multiple holes drilled at an explicit list of (x, y) positions on a face."
+
+when_to_use: >-
+  Hole locations are given as discrete named coordinates: corner holes, irregular
+  bolt patterns, or any arrangement that does not form a uniform rectangular
+  grid. Prefer over rarray whenever positions are non-uniform.
+
+idiom: |
+  .faces(">Z").workplane()
+  .pushPoints([(x1, y1), (x2, y2), ...])
+  .hole(diameter)
+
+avoid:
+  - ".eachpoint(lambda loc: cq.Workplane(loc).circle(r), positions, True).cutThruAll() -- produces Wire/vector errors"
+  - "Computing positions inline in .pushPoints() with complex expressions -- pre-compute in named variables"
+  - ".polarArray() for non-circular bolt patterns -- use pushPoints with explicit (x, y) tuples"
+
+parameters:
+  positions: {type: "list[(float, float)]", unit: mm, description: "(x, y) centres relative to the face workplane origin"}
+  diameter:  {type: float, unit: mm, description: "Hole diameter (applied uniformly to all points)"}
+
+example: |
+  import cadquery as cq
+
+
+  def build_model():
+      width  = 100.0
+      height =  60.0
+      thick  =   6.0
+      hole_d =   5.0
+      margin =  10.0
+
+      cx = width  / 2 - margin
+      cy = height / 2 - margin
+
+      return (
+          cq.Workplane("XY")
+          .box(width, height, thick)
+          .faces(">Z").workplane()
+          .pushPoints([
+              ( cx,  cy),
+              (-cx,  cy),
+              ( cx, -cy),
+              (-cx, -cy),
+          ])
+          .hole(hole_d)
+      )
+
+repair_hints:
+  - "Wire/vector error: rewrite .eachpoint(lambda loc: ...) as .pushPoints([...]).hole(d)."
+  - "Holes on wrong face: change the face selector before .pushPoints()."
+  - "Holes at unexpected positions: coordinates are relative to the face workplane origin (face centre by default)."

@@ -1,0 +1,64 @@
+name: connector_block
+category: assembly
+purpose: "Rectangular block with a rectangular pocket on a face for seating a connector body, plus mounting holes."
+
+when_to_use: >-
+  A transition block mounts an electrical or mechanical connector to a panel or
+  housing. The block provides material for fastening; the pocket locates and
+  retains the connector body flush or recessed into the face.
+
+idiom: |
+  (cq.Workplane("XY")
+      .box(width, height, depth)
+      .faces(">X").workplane()
+      .rect(conn_w, conn_h).cutBlind(-pocket_d)
+      .faces(">Z").workplane()
+      .pushPoints([...]).hole(bolt_d))
+
+avoid:
+  - ".cutThruAll() for the connector pocket -- use .cutBlind(-depth) to retain the back wall"
+  - "Omitting mounting holes"
+  - "Pocket on wrong face: match the face selector to the connector access direction"
+
+parameters:
+  width:    {type: float, unit: mm, description: "Block X dimension"}
+  height:   {type: float, unit: mm, description: "Block Y dimension"}
+  depth:    {type: float, unit: mm, description: "Block Z dimension"}
+  conn_w:   {type: float, unit: mm, description: "Connector pocket width"}
+  conn_h:   {type: float, unit: mm, description: "Connector pocket height"}
+  pocket_d: {type: float, unit: mm, description: "Connector seating pocket depth"}
+  bolt_d:   {type: float, unit: mm, description: "Mounting bolt hole diameter"}
+
+example: |
+  import cadquery as cq
+
+
+  def build_model():
+      width    = 60.0
+      height   = 40.0
+      depth    = 25.0
+      conn_w   = 30.0
+      conn_h   = 20.0
+      pocket_d =  5.0
+      bolt_d   =  4.0
+      margin   =  7.0
+
+      cx = width  / 2 - margin
+      cy = height / 2 - margin
+
+      return (
+          cq.Workplane("XY")
+          .box(width, height, depth)
+          .faces(">X").workplane()
+          .rect(conn_w, conn_h)
+          .cutBlind(-pocket_d)
+          .faces(">Z").workplane()
+          .pushPoints([( cx,  cy), (-cx,  cy),
+                       ( cx, -cy), (-cx, -cy)])
+          .hole(bolt_d)
+      )
+
+repair_hints:
+  - "Pocket cuts through: replace .cutThruAll() with .cutBlind(-pocket_d)."
+  - "Pocket on wrong face: change .faces('>X') to the face facing the connector access direction."
+  - "Pocket position offset: rect() is centred on the face workplane origin (face centre) by default."

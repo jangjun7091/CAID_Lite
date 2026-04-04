@@ -1,0 +1,48 @@
+name: through_hole
+category: feature
+purpose: "Single circular hole penetrating the full depth of a solid from entry face to exit face."
+
+when_to_use: >-
+  One fastener clearance or pilot hole is needed at a specific position on a
+  face. The hole passes completely through the solid.
+
+idiom: |
+  # Centred on the face
+  .faces(">Z").workplane().hole(diameter)
+
+  # Offset from face centre
+  .faces(">Z").workplane().center(x_off, y_off).hole(diameter)
+
+avoid:
+  - ".circle(r).cutThruAll() for a simple round hole -- .hole(d) is cleaner and handles direction automatically"
+  - "Calling .hole() without first selecting a face with .faces().workplane()"
+  - ".eachpoint(lambda loc: cq.Workplane(loc).circle(r), [pos], True).cutThruAll() -- causes Wire errors"
+
+parameters:
+  diameter: {type: float, unit: mm, description: "Hole diameter"}
+  x_off:    {type: float, unit: mm, description: "X offset from face centre (default 0)"}
+  y_off:    {type: float, unit: mm, description: "Y offset from face centre (default 0)"}
+
+example: |
+  import cadquery as cq
+
+
+  def build_model():
+      width  = 60.0
+      height = 40.0
+      thick  =  8.0
+      hole_d =  6.0
+      x_off  = 15.0
+
+      return (
+          cq.Workplane("XY")
+          .box(width, height, thick)
+          .faces(">Z").workplane()
+          .center(x_off, 0)
+          .hole(hole_d)
+      )
+
+repair_hints:
+  - "Wire or type error: replace .circle(r).cutThruAll() with .hole(diameter)."
+  - "Hole on wrong face: change the face selector (e.g. '<Z', '|X', '>Y')."
+  - "Hole does not go through: omit the depth argument from .hole() for a full through-hole."

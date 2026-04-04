@@ -1,0 +1,40 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip install:*)",
+      "Bash(pip show:*)",
+      "Bash(python -m pytest tests/unit/ -v)",
+      "Bash(python -m pytest tests/unit/ -v --tb=short)",
+      "Bash(ls \"C:\\\\Users\\\\JJH\\\\CAID_Lite\\\\src\\\\caid_lite\"\" && ls \"C:UsersJJHCAID_Litesrccaid_litevalidator\" 2>/dev/null || echo \"validator dir missing\" && ls \"C:UsersJJHCAID_Litesrccaid_literepair\" 2>/dev/null || echo \"repair dir missing \")",
+      "Bash(python -m pytest tests/unit/ tests/integration/ -v --tb=short)",
+      "Bash(python -m pytest tests/integration/test_api.py -v --tb=short)",
+      "Bash(python -m pytest tests/unit/ -v --tb=short -q)",
+      "Bash(python -m pytest tests/integration/test_api.py -v --tb=short --timeout=30)",
+      "Bash(python -c \":*)",
+      "Bash(python -m pytest tests/ -x --tb=short -q)",
+      "Bash(python -m pytest tests/integration/test_api.py -v --tb=long)",
+      "Bash(python -m pytest tests/integration/test_api.py::TestPostChat::test_returns_part_id -v --tb=long)",
+      "Bash(python -m pytest tests/ -v --tb=short)",
+      "Bash(python -m pytest tests/integration/ -v --tb=short)",
+      "Bash(set PYTHONIOENCODING=utf-8)",
+      "Bash(python -m pytest tests/integration/ --tb=short -p no:warnings)",
+      "Bash(python -W ignore -m pytest tests/integration/ --tb=short)",
+      "Bash(python -m pytest tests/integration/test_api.py::TestPostChat -v --no-header)",
+      "Bash(python -m pytest tests/integration/test_api.py -v --no-header)",
+      "Bash(python -m pytest tests/integration/test_api.py::TestGetParts tests/integration/test_api.py::TestGetPart tests/integration/test_api.py::TestDeletePart tests/integration/test_api.py::TestWorkspaceRoutes -v --no-header)",
+      "Bash(python -m pytest tests/integration/test_api.py::TestEventsRoute -v)",
+      "Bash(python -c \"print\\(''hello''\\)\")",
+      "Bash(python -m pytest tests/integration/test_api.py::TestEventsRoute::test_events_endpoint_reachable -v --no-header)",
+      "Bash(python -m pytest tests/integration/test_api.py::TestEventsRoute -v --no-header)",
+      "Bash(python -m pytest tests/unit/ tests/integration/ -v --no-header)",
+      "Bash(python -c \"import httpx; print\\(httpx.__version__\\)\")",
+      "Bash(python -m pytest tests/unit/ tests/integration/ --no-header -q)",
+      "Bash(find C:UsersJJHCAID_Lite -type f \\\\\\(-name .env.example -o -path */src/caid_lite/llm/* -o -name pipeline.py -o -name default.yaml \\\\\\))",
+      "Bash(python -c \"import os; print\\(''QWEN_API_KEY set:'', bool\\(os.getenv\\(''QWEN_API_KEY''\\)\\)\\); print\\(''QWEN_API_BASE:'', os.getenv\\(''QWEN_API_BASE'', ''\\(not set\\)''\\)\\); print\\(''LLM_PROVIDER:'', os.getenv\\(''LLM_PROVIDER'', ''\\(not set\\)''\\)\\); print\\(''LLM_MODEL:'', os.getenv\\(''LLM_MODEL'', ''\\(not set\\)''\\)\\)\")",
+      "Bash(grep -v \"^$\")",
+      "Bash(xargs grep:*)",
+      "Bash(python -m pytest tests/unit/ -x -q)",
+      "Bash(python -m pytest tests/unit/ -q)"
+    ]
+  }
+}

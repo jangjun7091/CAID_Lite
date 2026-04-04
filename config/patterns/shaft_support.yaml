@@ -1,0 +1,68 @@
+name: shaft_support
+category: assembly
+purpose: "Base plate with a central cylindrical boss providing a bore to align and support a rotating shaft."
+
+when_to_use: >-
+  Supporting one end of a shaft, leadscrew, or axle. The base plate is bolted
+  to a surface; the boss locates and supports the shaft radially. Combine with
+  bearing_mount if a rolling element bearing is needed.
+
+idiom: |
+  (cq.Workplane("XY")
+      .box(base_w, base_h, base_t)
+      .faces(">Z").workplane()
+      .circle(boss_r).extrude(boss_h)
+      .faces(">Z").workplane()
+      .hole(bore_d)
+      .faces("<Z").workplane()
+      .pushPoints([...]).hole(mount_d))
+
+avoid:
+  - "bore_d >= 2 * boss_r -- removes all boss wall material"
+  - "Using .cylinder() instead of .circle().extrude() for the boss on the plate face"
+  - "Omitting mounting holes in the base plate"
+
+parameters:
+  base_w:  {type: float, unit: mm, description: "Base plate X dimension"}
+  base_h:  {type: float, unit: mm, description: "Base plate Y dimension"}
+  base_t:  {type: float, unit: mm, description: "Base plate thickness"}
+  boss_r:  {type: float, unit: mm, description: "Boss outer radius"}
+  boss_h:  {type: float, unit: mm, description: "Boss height above base plate"}
+  bore_d:  {type: float, unit: mm, description: "Shaft bore diameter"}
+  mount_d: {type: float, unit: mm, description: "Mounting bolt hole diameter"}
+
+example: |
+  import cadquery as cq
+
+
+  def build_model():
+      base_w = 80.0
+      base_h = 60.0
+      base_t  =  8.0
+      boss_r = 18.0
+      boss_h = 20.0
+      bore_d = 20.0
+      bolt_d  =  5.0
+      margin =  10.0
+
+      cx = base_w / 2 - margin
+      cy = base_h / 2 - margin
+
+      return (
+          cq.Workplane("XY")
+          .box(base_w, base_h, base_t)
+          .faces(">Z").workplane()
+          .circle(boss_r)
+          .extrude(boss_h)
+          .faces(">Z").workplane()
+          .hole(bore_d)
+          .faces("<Z").workplane()
+          .pushPoints([( cx,  cy), (-cx,  cy),
+                       ( cx, -cy), (-cx, -cy)])
+          .hole(bolt_d)
+      )
+
+repair_hints:
+  - "Boss detaches from plate: .faces('>Z').workplane() must be called on the plate top face before .circle().extrude()."
+  - "Bore direction wrong: .hole() cuts along the workplane normal; ensure the boss top face is selected."
+  - "Mounting holes on wrong face: .faces('<Z').workplane() accesses the base bottom face."

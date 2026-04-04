@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CAID Lite</title>
+  <link rel="stylesheet" href="style.css">
+
+  <!-- Three.js r160 via ESM import map -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <header id="app-header">
+    <span class="app-title">CAID Lite</span>
+    <span id="conn-status" class="status-dot" title="Connecting…"></span>
+  </header>
+
+  <main class="workspace">
+
+    <!-- ── Left: Parts Shelf ───────────────────────────────────────────── -->
+    <aside id="parts-shelf">
+      <div class="shelf-header">
+        <h2>Parts</h2>
+      </div>
+      <ul id="parts-list">
+        <li class="shelf-empty">No parts yet. Submit a prompt to start.</li>
+      </ul>
+    </aside>
+
+    <!-- ── Center: 3D Workspace ───────────────────────────────────────── -->
+    <section id="viewport">
+      <div id="viewport-placeholder">
+        <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="8" y="16" width="48" height="36" rx="2"/>
+          <path d="M8 28 L32 20 L56 28"/>
+          <path d="M32 20 L32 52"/>
+        </svg>
+        <p id="placeholder-text">Select a ready part to preview</p>
+      </div>
+
+      <canvas id="three-canvas"></canvas>
+
+      <div id="part-info">
+        <div id="part-info-name"></div>
+        <div id="part-info-meta"></div>
+      </div>
+
+      <div id="download-bar">
+        <a id="download-step" class="dl-btn" title="Download STEP">
+          <svg viewBox="0 0 16 16" fill="currentColor">
+            <path d="M8 12l-4-4h2.5V3h3v5H12L8 12z"/>
+            <rect x="2" y="13" width="12" height="1.5" rx=".75"/>
+          </svg>
+          STEP
+        </a>
+        <a id="download-stl" class="dl-btn" title="Download STL">
+          <svg viewBox="0 0 16 16" fill="currentColor">
+            <path d="M8 12l-4-4h2.5V3h3v5H12L8 12z"/>
+            <rect x="2" y="13" width="12" height="1.5" rx=".75"/>
+          </svg>
+          STL
+        </a>
+      </div>
+    </section>
+
+    <!-- ── Right: AI Chat ─────────────────────────────────────────────── -->
+    <aside id="chat-panel">
+      <div class="chat-header">
+        <h2>Chat</h2>
+      </div>
+      <div id="chat-messages"></div>
+      <form id="chat-form">
+        <textarea
+          id="chat-input"
+          placeholder="Describe a CAD model… (Enter to send, Shift+Enter for newline)"
+          rows="3"
+          autocomplete="off"
+          spellcheck="true"
+        ></textarea>
+        <button type="submit" id="send-btn">Generate</button>
+      </form>
+    </aside>
+
+  </main>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

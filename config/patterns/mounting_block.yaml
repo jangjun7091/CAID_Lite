@@ -1,0 +1,55 @@
+name: mounting_block
+category: assembly
+purpose: "Solid rectangular block with bolt holes for bolted attachment to a mating surface."
+
+when_to_use: >-
+  A structural interface block connecting two sub-assemblies via through bolts.
+  Typical in motor mounts, sensor brackets, and framing joints where a flat
+  bolted face is needed with adequate material depth for thread engagement.
+
+idiom: |
+  (cq.Workplane("XY")
+      .box(width, height, depth)
+      .faces(">Z").workplane()
+      .pushPoints([(x1, y1), ...])
+      .hole(bolt_d))
+
+avoid:
+  - "Drilling holes before the block geometry is complete"
+  - "Using .rarray() for asymmetric or edge-inset hole patterns -- pushPoints is clearer"
+  - "Omitting face selection before .pushPoints() -- always chain .faces().workplane() first"
+
+parameters:
+  width:  {type: float, unit: mm, description: "X dimension"}
+  height: {type: float, unit: mm, description: "Y dimension"}
+  depth:  {type: float, unit: mm, description: "Z dimension"}
+  bolt_d: {type: float, unit: mm, description: "Mounting bolt hole diameter"}
+  margin: {type: float, unit: mm, description: "Hole inset from each edge"}
+
+example: |
+  import cadquery as cq
+
+
+  def build_model():
+      width  = 80.0
+      height = 60.0
+      depth  = 20.0
+      bolt_d =  5.0
+      margin = 10.0
+
+      cx = width  / 2 - margin
+      cy = height / 2 - margin
+
+      return (
+          cq.Workplane("XY")
+          .box(width, height, depth)
+          .faces(">Z").workplane()
+          .pushPoints([( cx,  cy), (-cx,  cy),
+                       ( cx, -cy), (-cx, -cy)])
+          .hole(bolt_d)
+      )
+
+repair_hints:
+  - "Holes on wrong face: change .faces('>Z') to the intended face selector."
+  - "For holes on two faces (e.g. top and side): call .faces().workplane().pushPoints().hole() twice in sequence."
+  - "Hole positions wrong: coordinates are relative to the selected face workplane origin (face centre)."

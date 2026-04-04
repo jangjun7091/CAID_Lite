@@ -1,0 +1,46 @@
+name: bearing_mount
+category: assembly
+purpose: "Cylindrical housing with a precision bore sized to accept a rolling-element bearing."
+
+when_to_use: >-
+  A bore must seat a bearing by press or slip fit. The housing outer radius
+  provides structural wall thickness; the bore diameter matches the bearing
+  outer diameter. Tolerance is captured in the bore dimension.
+
+idiom: |
+  (cq.Workplane("XY")
+      .cylinder(height, housing_r)
+      .faces(">Z").workplane()
+      .hole(bore_d))
+
+avoid:
+  - "bore_d >= 2 * housing_r -- eliminates all wall material"
+  - ".circle(r).cutThruAll() for the bore -- .hole(bore_d) handles direction and depth cleanly"
+  - "Omitting the wall thickness check: (housing_r - bore_r) must be > 0"
+
+parameters:
+  height:    {type: float, unit: mm, description: "Axial housing length (typically bearing width)"}
+  housing_r: {type: float, unit: mm, description: "Outer housing radius"}
+  bore_d:    {type: float, unit: mm, description: "Bore diameter equal to the bearing outer diameter"}
+
+example: |
+  import cadquery as cq
+
+
+  def build_model():
+      # Example: 6004 bearing, OD = 42 mm
+      height    = 12.0   # bearing width
+      housing_r = 25.0   # outer housing radius (6 mm wall)
+      bore_d    = 42.0   # bearing outer diameter
+
+      return (
+          cq.Workplane("XY")
+          .cylinder(height, housing_r)
+          .faces(">Z").workplane()
+          .hole(bore_d)
+      )
+
+repair_hints:
+  - "Empty solid or geometry error: bore_d must be strictly less than 2 * housing_r."
+  - "For a flanged housing: extrude a wider disc first, then add the cylindrical hub on top."
+  - "For a retaining ring groove: add .faces('>Z').workplane().circle((bore_d/2)+groove_w).cutBlind(-groove_d) after bore."

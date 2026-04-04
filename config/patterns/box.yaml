@@ -1,0 +1,46 @@
+name: box
+category: solid
+purpose: "Solid or thin-walled rectangular enclosure, housing, or structural block."
+
+when_to_use: >-
+  Use for enclosures, housings, or blocks where all six faces are flat and
+  rectangular. For a hollow shell, chain .shell(-wall_t) after .box().
+
+idiom: |
+  # Solid block
+  cq.Workplane("XY").box(width, height, depth)
+
+  # Hollow shell (open-top)
+  cq.Workplane("XY").box(width, height, depth).shell(-wall_t)
+
+avoid:
+  - "Constructing walls individually from faces and unioning -- .box().shell() is cleaner"
+  - "Passing a positive value to .shell() -- always negative to shell inward"
+  - "Applying .shell() after holes or fillets have been added -- shell must come first"
+
+parameters:
+  width:  {type: float, unit: mm, description: "X dimension"}
+  height: {type: float, unit: mm, description: "Y dimension"}
+  depth:  {type: float, unit: mm, description: "Z dimension"}
+  wall_t: {type: float, unit: mm, description: "Wall thickness for hollow variant (positive value)"}
+
+example: |
+  import cadquery as cq
+
+
+  def build_model():
+      width  = 80.0
+      height = 50.0
+      depth  = 40.0
+      wall_t =  3.0
+
+      return (
+          cq.Workplane("XY")
+          .box(width, height, depth)
+          .shell(-wall_t)
+      )
+
+repair_hints:
+  - "shell() geometry error: the value must be negative (e.g. .shell(-3.0))."
+  - "Shell fails on complex geometry: apply shell only to clean boxes before adding holes or fillets."
+  - "Open face needed: pass the face selector to .shell(-wall_t, '.faces(\">Z\")')."

@@ -1,0 +1,34 @@
+name: cylinder
+category: solid
+purpose: "Solid cylinder; base for shafts, pins, bosses, and rotational components."
+
+when_to_use: >-
+  The cross-section is circular and the part is a standalone solid or the
+  starting body for a turned component (shaft, pin, standoff, knob).
+
+idiom: |
+  cq.Workplane("XY").cylinder(height, radius)
+
+avoid:
+  - "Passing diameter instead of radius -- .cylinder() takes radius as the second argument"
+  - ".circle(r).extrude(h) is equivalent but .cylinder() is more explicit and preferred"
+  - "Omitting .faces('>Z').workplane() before adding a bore or face features"
+
+parameters:
+  height: {type: float, unit: mm, description: "Axial length along Z"}
+  radius: {type: float, unit: mm, description: "Cross-section radius (not diameter)"}
+
+example: |
+  import cadquery as cq
+
+
+  def build_model():
+      height = 40.0
+      radius = 15.0
+
+      return cq.Workplane("XY").cylinder(height, radius)
+
+repair_hints:
+  - "Argument order: .cylinder(height, radius) -- height is first, radius is second."
+  - "For a bore or stepped feature, chain .faces('>Z').workplane().hole(d) after .cylinder()."
+  - "For a cylinder not centred on origin, use .center(x, y) after .workplane() before .cylinder()."

@@ -1,0 +1,23 @@
+llm:
+  # Provider: qwen | openai | anthropic | local
+  # Override at runtime with env vars: LLM_PROVIDER, LLM_MODEL
+  provider: "qwen"
+  model: "qwen3-coder-30b-a3b-instruct"
+  temperature: 0.2
+  max_tokens: 4096
+
+executor:
+  timeout_s: 60
+
+repair:
+  max_repair_attempts: 3
+
+exporter:
+  formats:
+    - "step"
+    - "stl"
+  output_dir: "outputs"
+
+logging:
+  log_dir: "data/logs"
+  console_level: "INFO"

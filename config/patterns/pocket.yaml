@@ -1,0 +1,45 @@
+name: pocket
+category: feature
+purpose: "Flat-bottomed rectangular recess milled into a face without penetrating the opposite face."
+
+when_to_use: >-
+  A rectilinear cavity for component seating, label recesses, weight reduction
+  pockets, or any bounded flat-bottomed cut that must not break through.
+
+idiom: |
+  .faces(">Z").workplane().rect(pocket_w, pocket_h).cutBlind(-depth)
+
+avoid:
+  - ".cutThruAll() instead of .cutBlind(-depth) -- produces an unwanted through-cut"
+  - "Positive value in .cutBlind() -- the depth argument must be negative to cut downward"
+  - ".hole() for a rectangular pocket -- .hole() only creates circular holes"
+
+parameters:
+  pocket_w: {type: float, unit: mm, description: "Pocket width along X"}
+  pocket_h: {type: float, unit: mm, description: "Pocket height along Y"}
+  depth:    {type: float, unit: mm, description: "Recess depth (passed as -depth to cutBlind)"}
+
+example: |
+  import cadquery as cq
+
+
+  def build_model():
+      width    = 80.0
+      height   = 60.0
+      thick    = 15.0
+      pock_w   = 50.0
+      pock_h   = 35.0
+      pock_dep =  8.0
+
+      return (
+          cq.Workplane("XY")
+          .box(width, height, thick)
+          .faces(">Z").workplane()
+          .rect(pock_w, pock_h)
+          .cutBlind(-pock_dep)
+      )
+
+repair_hints:
+  - "Pocket cuts through: replace .cutThruAll() with .cutBlind(-depth)."
+  - "cutBlind positive-arg error: negate the depth value (e.g. .cutBlind(-8.0))."
+  - "For a rounded-corner pocket: cut a slot2D or chain .edges() to fillet the pocket edges afterward."

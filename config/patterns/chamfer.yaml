@@ -1,0 +1,42 @@
+name: chamfer
+category: feature
+purpose: "Angled 45-degree edge break for deburring, assembly lead-in, and sharp-corner removal."
+
+when_to_use: >-
+  Edges need a clean angled break rather than a curved fillet. Common on entry
+  edges of holes, outer corners of panels, and press-fit lead-in edges where a
+  sharp chamfer is mechanically specified.
+
+idiom: |
+  result.edges("|Z").chamfer(size)   # vertical corner edges
+  result.edges(">Z").chamfer(size)   # top-face perimeter edges
+
+avoid:
+  - "Applying chamfer before holes and pockets are complete -- same sequencing rule as fillet"
+  - "size >= half the minimum adjacent wall thickness -- OCC will reject the geometry"
+  - "Using .fillet() when a crisp 45-degree break is mechanically required"
+
+parameters:
+  size: {type: float, unit: mm, description: "Chamfer leg length (equal on both adjacent faces)"}
+
+example: |
+  import cadquery as cq
+
+
+  def build_model():
+      width  = 80.0
+      height = 50.0
+      thick  =  8.0
+      c      =  1.5
+
+      return (
+          cq.Workplane("XY")
+          .box(width, height, thick)
+          .edges(">Z")
+          .chamfer(c)
+      )
+
+repair_hints:
+  - "Geometry error: size is too large relative to the adjacent wall; reduce the chamfer size."
+  - "Wrong edges: refine the selector -- '>Z' for top-face edges, '|Z' for vertical corners."
+  - "Apply chamfers last, after all cuts, holes, and bosses, exactly as with fillets."
