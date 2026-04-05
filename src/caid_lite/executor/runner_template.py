@@ -112,14 +112,62 @@ def _run() -> dict:
     # ── Step 6: Collect geometry metrics ─────────────────────────────────────
     validation_metrics: dict | None = None
     try:
+        import math as _math
         shape = model.val()
         bb = shape.BoundingBox()
+
+        # ── Basic metrics ─────────────────────────────────────────────────────
+        bbox_dims = [bb.xlen, bb.ylen, bb.zlen]
+        max_dim = max(bbox_dims) if bbox_dims else 0.0
+        nonzero_dims = [d for d in bbox_dims if d > 1e-9]
+        min_dim = min(nonzero_dims) if nonzero_dims else 0.0
+        aspect_ratio = round(max_dim / min_dim, 2) if min_dim > 0 else None
+
+        # ── Surface area ─────────────────────────────────────────────────────
+        try:
+            surface_area = round(shape.Area(), 4)
+        except Exception:
+            surface_area = None
+
+        # ── Point distribution (surface spread CV) ────────────────────────────
+        # Tessellate with an adaptive tolerance for performance.
+        # spread_cv = stddev(dist_from_centroid) / mean(dist_from_centroid)
+        # A value near 0 means uniform spread; > 0.8 may indicate irregular geometry.
+        point_count: int | None = None
+        spread_cv: float | None = None
+        try:
+            tol = max(max_dim / 50.0, 0.5) if max_dim > 0 else 1.0
+            verts, _tris = shape.tessellate(tol)
+            n = len(verts)
+            if n >= 4:
+                point_count = n
+                # Limit to first 2000 vertices for performance on complex shapes
+                sample = verts[:2000]
+                ns = len(sample)
+                cx = sum(v.x for v in sample) / ns
+                cy = sum(v.y for v in sample) / ns
+                cz = sum(v.z for v in sample) / ns
+                dists = [
+                    _math.sqrt((v.x - cx) ** 2 + (v.y - cy) ** 2 + (v.z - cz) ** 2)
+                    for v in sample
+                ]
+                mean_d = sum(dists) / ns
+                if mean_d > 0:
+                    variance = sum((d - mean_d) ** 2 for d in dists) / ns
+                    spread_cv = round(_math.sqrt(variance) / mean_d, 4)
+        except Exception:
+            pass
+
         validation_metrics = {
-            "is_valid": shape.isValid(),
-            "is_solid": isinstance(shape, (cq.Solid, cq.Compound)) and len(shape.Solids()) > 0,
-            "volume": shape.Volume(),
-            "face_count": len(shape.Faces()),
-            "bbox": [bb.xlen, bb.ylen, bb.zlen],
+            "is_valid":     shape.isValid(),
+            "is_solid":     isinstance(shape, (cq.Solid, cq.Compound)) and len(shape.Solids()) > 0,
+            "volume":       shape.Volume(),
+            "face_count":   len(shape.Faces()),
+            "bbox":         bbox_dims,
+            "surface_area": surface_area,
+            "aspect_ratio": aspect_ratio,
+            "point_count":  point_count,
+            "spread_cv":    spread_cv,
         }
     except Exception:
         # Non-fatal: export can still proceed even if metrics collection fails.

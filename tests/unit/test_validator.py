@@ -19,6 +19,10 @@ _VALID_METRICS = {
     "volume": 1000.0,
     "face_count": 6,
     "bbox": [10.0, 10.0, 10.0],
+    "surface_area": 600.0,
+    "aspect_ratio": 1.0,
+    "point_count": 120,
+    "spread_cv": 0.35,
 }
 
 
@@ -206,3 +210,145 @@ class TestGeometryValidatorMissingMetrics:
     def test_none_metrics_error_is_descriptive(self, validator):
         result = validator.validate(None)
         assert len(result.errors[0]) > 20
+
+
+# ── GeometryValidator — parameter sanity checks ───────────────────────────────
+
+
+class TestGeometryValidatorSanityChecks:
+    """Dimension and parameter range sanity checks.
+
+    Hard limit: any bbox dim > 10 000 mm (unit error)
+    Soft limit: any bbox dim > 2 000 mm (suspicious)
+    Soft limit: min nonzero bbox dim < 0.05 mm (too thin)
+    Soft limit: aspect_ratio > 200 (very elongated)
+    """
+
+    def test_extreme_dimension_hard_failure(self, validator):
+        # 15 000 mm = 15 m → must be a unit error
+        result = validator.validate(_metrics(bbox=[15_000.0, 40.0, 10.0]))
+        assert result.valid is False
+        assert any("extreme dimension" in e.lower() or "10" in e for e in result.errors)
+
+    def test_dimension_exactly_at_hard_limit_fails(self, validator):
+        result = validator.validate(_metrics(bbox=[10_001.0, 10.0, 10.0]))
+        assert result.valid is False
+
+    def test_dimension_at_hard_limit_boundary_passes(self, validator):
+        # Exactly 10 000 mm is the boundary — should NOT trigger the hard error
+        result = validator.validate(_metrics(bbox=[10_000.0, 10.0, 10.0]))
+        assert result.valid is True
+
+    def test_large_dimension_warns(self, validator):
+        # 2 500 mm is large but under 10 000 mm — warning only
+        result = validator.validate(_metrics(bbox=[2_500.0, 40.0, 10.0]))
+        assert result.valid is True
+        assert any("large dimension" in w.lower() or "mm" in w for w in result.warnings)
+
+    def test_normal_dimension_no_sanity_warning(self, validator):
+        result = validator.validate(_VALID_METRICS)
+        sanity_warns = [w for w in result.warnings if "dimension" in w.lower() or "aspect" in w.lower()]
+        assert sanity_warns == []
+
+    def test_very_thin_dimension_warns(self, validator):
+        # 0.01 mm is extremely thin → soft warning
+        result = validator.validate(_metrics(bbox=[100.0, 50.0, 0.01]))
+        assert result.valid is True
+        assert any("thin" in w.lower() or "0.01" in w for w in result.warnings)
+
+    def test_dimension_just_above_thin_threshold_no_warn(self, validator):
+        result = validator.validate(_metrics(bbox=[100.0, 50.0, 0.06]))
+        thin_warns = [w for w in result.warnings if "thin" in w.lower()]
+        assert thin_warns == []
+
+    def test_high_aspect_ratio_warns(self, validator):
+        # bbox [500, 1, 1] → aspect ratio 500 > 200
+        result = validator.validate(_metrics(bbox=[500.0, 1.0, 1.0]))
+        assert result.valid is True
+        assert any("aspect ratio" in w.lower() for w in result.warnings)
+
+    def test_acceptable_aspect_ratio_no_warn(self, validator):
+        # bbox [200, 10, 5] → aspect ratio 40, fine
+        result = validator.validate(_metrics(bbox=[200.0, 10.0, 5.0]))
+        aspect_warns = [w for w in result.warnings if "aspect" in w.lower()]
+        assert aspect_warns == []
+
+    def test_multiple_sanity_issues_all_reported(self, validator):
+        # Large dimension AND high aspect ratio
+        result = validator.validate(_metrics(bbox=[3_000.0, 5.0, 5.0]))
+        assert result.valid is True
+        assert len(result.warnings) >= 2
+
+    def test_metrics_without_aspect_ratio_key_no_crash(self, validator):
+        m = {k: v for k, v in _VALID_METRICS.items() if k != "aspect_ratio"}
+        result = validator.validate(m)
+        assert result.valid is True  # should not crash
+
+
+# ── GeometryValidator — surface distribution metrics ─────────────────────────
+
+
+class TestGeometryValidatorSurfaceMetrics:
+    """Point distribution (spread_cv) and surface area checks.
+
+    spread_cv > 0.85 → soft warning (irregular surface)
+    surface_area present → stored in metrics dict, no check required
+    """
+
+    def test_normal_spread_cv_no_warning(self, validator):
+        result = validator.validate(_VALID_METRICS)
+        spread_warns = [w for w in result.warnings if "spread" in w.lower() or "distribution" in w.lower()]
+        assert spread_warns == []
+
+    def test_high_spread_cv_produces_warning(self, validator):
+        result = validator.validate(_metrics(spread_cv=0.92))
+        assert result.valid is True   # soft check — does not block
+        assert any("distribution" in w.lower() or "spread" in w.lower() for w in result.warnings)
+
+    def test_spread_cv_at_threshold_no_warning(self, validator):
+        # Exactly at 0.85 — should NOT warn
+        result = validator.validate(_metrics(spread_cv=0.85))
+        spread_warns = [w for w in result.warnings if "spread" in w.lower() or "distribution" in w.lower()]
+        assert spread_warns == []
+
+    def test_spread_cv_just_above_threshold_warns(self, validator):
+        result = validator.validate(_metrics(spread_cv=0.86))
+        assert any("spread" in w.lower() or "distribution" in w.lower() for w in result.warnings)
+
+    def test_missing_spread_cv_no_crash(self, validator):
+        m = {k: v for k, v in _VALID_METRICS.items() if k != "spread_cv"}
+        result = validator.validate(m)
+        assert result.valid is True
+
+    def test_none_spread_cv_no_crash(self, validator):
+        result = validator.validate(_metrics(spread_cv=None))
+        assert result.valid is True
+
+    def test_surface_area_preserved_in_metrics(self, validator):
+        result = validator.validate(_VALID_METRICS)
+        assert result.metrics.get("surface_area") == 600.0
+
+    def test_point_count_preserved_in_metrics(self, validator):
+        result = validator.validate(_VALID_METRICS)
+        assert result.metrics.get("point_count") == 120
+
+    def test_aspect_ratio_preserved_in_metrics(self, validator):
+        result = validator.validate(_VALID_METRICS)
+        assert result.metrics.get("aspect_ratio") == 1.0
+
+    def test_full_metrics_with_all_new_fields_passes(self, validator):
+        # Simulate realistic runner output for a 50x40x6 plate
+        metrics = {
+            "is_valid": True,
+            "is_solid": True,
+            "volume": 12_000.0,
+            "face_count": 6,
+            "bbox": [50.0, 40.0, 6.0],
+            "surface_area": 5_080.0,
+            "aspect_ratio": 8.33,
+            "point_count": 240,
+            "spread_cv": 0.42,
+        }
+        result = validator.validate(metrics)
+        assert result.valid is True
+        assert result.errors == []
