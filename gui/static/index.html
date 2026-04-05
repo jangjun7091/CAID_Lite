@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CAID Lite</title>
   <link rel="stylesheet" href="style.css">
+  <!-- highlight.js — Python syntax colouring for code modal -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github-dark.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/highlight.min.js"></script>
 
   <!-- Three.js r160 via ESM import map -->
   <script type="importmap">
@@ -47,12 +50,37 @@
 
       <canvas id="three-canvas"></canvas>
 
+      <!-- View preset toolbar (top-right) -->
+      <div id="view-toolbar">
+        <button class="view-btn" data-view="iso"   title="Isometric view (Home)">Iso</button>
+        <button class="view-btn" data-view="front" title="Front view (Numpad 1)">Front</button>
+        <button class="view-btn" data-view="top"   title="Top view (Numpad 7)">Top</button>
+        <button class="view-btn" data-view="right" title="Right view (Numpad 3)">Right</button>
+        <span class="toolbar-sep"></span>
+        <button id="wireframe-btn" class="view-btn" title="Toggle wireframe (W)">Wire</button>
+      </div>
+
+      <!-- Axis gizmo (bottom-right corner) -->
+      <canvas id="gizmo-canvas" title="Viewport orientation gizmo (X=red, Y=green, Z=blue)"></canvas>
+
+      <!-- Part info overlay (top-left) -->
       <div id="part-info">
         <div id="part-info-name"></div>
         <div id="part-info-meta"></div>
       </div>
 
+      <!-- Dimension badge (bottom-left) -->
+      <div id="dim-badge" class="hidden">
+        <span id="dim-text">— × — × — mm</span>
+      </div>
+
       <div id="download-bar">
+        <button id="code-btn" class="dl-btn" title="View generated CadQuery code">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M5 4L1 8l4 4M11 4l4 4-4 4M9 3l-2 10"/>
+          </svg>
+          Code
+        </button>
         <a id="download-step" class="dl-btn" title="Download STEP">
           <svg viewBox="0 0 16 16" fill="currentColor">
             <path d="M8 12l-4-4h2.5V3h3v5H12L8 12z"/>
@@ -89,6 +117,22 @@
     </aside>
 
   </main>
+
+  <!-- ── Code Modal ──────────────────────────────────────────────────────── -->
+  <div id="code-modal" class="hidden" role="dialog" aria-modal="true" aria-label="Generated CadQuery code">
+    <div id="code-modal-panel">
+      <div id="code-modal-header">
+        <span id="code-modal-title">Generated CadQuery Code</span>
+        <div id="code-modal-actions">
+          <button id="code-copy-btn" class="modal-action-btn" title="Copy code to clipboard">Copy</button>
+          <button id="code-modal-close" class="modal-close-btn" title="Close (Esc)">✕</button>
+        </div>
+      </div>
+      <div id="code-modal-body">
+        <pre><code id="code-content" class="language-python"></code></pre>
+      </div>
+    </div>
+  </div>
 
   <script type="module" src="app.js"></script>
 </body>

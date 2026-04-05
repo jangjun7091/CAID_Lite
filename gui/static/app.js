@@ -1,9 +1,9 @@
 /**
- * CAID Lite — 3-pane GUI
+ * CAID Lite — 3-pane GUI  (P1 update)
  *
  * Pane responsibilities:
  *   - Parts Shelf  : renders the parts list; handles selection
- *   - Viewport     : three.js STL preview + download bar
+ *   - Viewport     : Three.js STL preview + grid + gizmo + view toolbar + download bar
  *   - Chat Panel   : prompt input, message history, SSE status updates
  *
  * Communication:
@@ -12,6 +12,13 @@
  *   - GET  /api/events        SSE stream (status, ready, failed)
  *   - GET  /api/parts/:id/stl streamed into STL loader
  *   - GET  /api/parts/:id/step|stl  download links
+ *
+ * P1 additions:
+ *   - Reference grid + corner axis gizmo
+ *   - View preset buttons (Iso / Front / Top / Right)
+ *   - Wireframe toggle
+ *   - Dimension badge (W × H × D mm)
+ *   - Code view modal with syntax highlighting (highlight.js)
  */
 
 import * as THREE from "three";
@@ -42,28 +49,76 @@ const $chatInput       = document.getElementById("chat-input");
 const $sendBtn         = document.getElementById("send-btn");
 const $connStatus      = document.getElementById("conn-status");
 
-// ── Three.js setup ────────────────────────────────────────────────────────────
+// P1 additions
+const $viewToolbar     = document.getElementById("view-toolbar");
+const $wireframeBtn    = document.getElementById("wireframe-btn");
+const $gizmoCanvas     = document.getElementById("gizmo-canvas");
+const $dimBadge        = document.getElementById("dim-badge");
+const $dimText         = document.getElementById("dim-text");
+const $codeBtn         = document.getElementById("code-btn");
+const $codeModal       = document.getElementById("code-modal");
+const $codeModalClose  = document.getElementById("code-modal-close");
+const $codeModalTitle  = document.getElementById("code-modal-title");
+const $codeContent     = document.getElementById("code-content");
+const $codeCopyBtn     = document.getElementById("code-copy-btn");
+
+// ── Three.js — Main Renderer ──────────────────────────────────────────────────
 const renderer = new THREE.WebGLRenderer({ canvas: $canvas, antialias: true });
 renderer.setPixelRatio(window.devicePixelRatio);
-renderer.setClearColor(0x0f1117);
+renderer.setClearColor(0x0d1117);
 renderer.shadowMap.enabled = true;
 
 const scene  = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 10000);
+const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100000);
 const controls = new OrbitControls(camera, $canvas);
 controls.enableDamping = true;
 controls.dampingFactor = 0.08;
 
 // Lighting
-scene.add(new THREE.AmbientLight(0xffffff, 0.45));
-const key = new THREE.DirectionalLight(0xffffff, 1.0);
-key.position.set(1, 2, 1.5);
-scene.add(key);
-const fill = new THREE.DirectionalLight(0x8ab4f8, 0.4);
-fill.position.set(-1, -0.5, -1);
-scene.add(fill);
+scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+const keyLight = new THREE.DirectionalLight(0xffffff, 1.0);
+keyLight.position.set(1, 2, 1.5);
+scene.add(keyLight);
+const fillLight = new THREE.DirectionalLight(0x8ab4f8, 0.35);
+fillLight.position.set(-1, -0.5, -1);
+scene.add(fillLight);
 
-let currentMesh = null;
+// ── Grid ──────────────────────────────────────────────────────────────────────
+const gridHelper = new THREE.GridHelper(2000, 40, 0x2a3044, 0x1a1f2e);
+gridHelper.visible = false;
+scene.add(gridHelper);
+
+// ── Gizmo Renderer (separate small canvas, bottom-right) ─────────────────────
+const gizmoRenderer = new THREE.WebGLRenderer({ canvas: $gizmoCanvas, alpha: true, antialias: true });
+gizmoRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+gizmoRenderer.setSize(72, 72);
+
+const gizmoScene  = new THREE.Scene();
+const gizmoCamera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
+gizmoCamera.position.set(0, 0, 3);
+
+// Colored axis arrows: X=red, Y=green, Z=blue
+function makeAxisLine(dir, hex) {
+  const mat = new THREE.LineBasicMaterial({ color: hex, linewidth: 2 });
+  const pts = [new THREE.Vector3(0, 0, 0), dir.clone().normalize().multiplyScalar(0.9)];
+  return new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), mat);
+}
+gizmoScene.add(makeAxisLine(new THREE.Vector3(1, 0, 0), 0xe74c3c));  // X red
+gizmoScene.add(makeAxisLine(new THREE.Vector3(0, 1, 0), 0x2ecc71));  // Y green
+gizmoScene.add(makeAxisLine(new THREE.Vector3(0, 0, 1), 0x3498db));  // Z blue
+
+// Small sphere at origin
+const originMesh = new THREE.Mesh(
+  new THREE.SphereGeometry(0.07, 8, 8),
+  new THREE.MeshBasicMaterial({ color: 0xaaaaaa })
+);
+gizmoScene.add(originMesh);
+
+// ── Mesh state ────────────────────────────────────────────────────────────────
+let currentMesh     = null;
+let baseMaterial    = null;    // stored solid material for wireframe toggle
+let wireframeMode   = false;
+let currentModelDiag = 200;   // bounding-box diagonal, updated on each STL load
 
 function resizeRenderer() {
   const w = $viewport.clientWidth;
@@ -77,12 +132,71 @@ function animate() {
   requestAnimationFrame(animate);
   controls.update();
   renderer.render(scene, camera);
+
+  // Sync gizmo camera orientation with main camera
+  const dir = camera.position.clone().sub(controls.target).normalize();
+  gizmoCamera.position.copy(dir.multiplyScalar(3));
+  gizmoCamera.up.copy(camera.up);
+  gizmoCamera.lookAt(0, 0, 0);
+  gizmoRenderer.render(gizmoScene, gizmoCamera);
 }
 
 const resizeObs = new ResizeObserver(resizeRenderer);
 resizeObs.observe($viewport);
 resizeRenderer();
 animate();
+
+// ── View presets ──────────────────────────────────────────────────────────────
+function setView(name) {
+  const d = currentModelDiag * 1.1;
+  const presets = {
+    iso:   { pos: [d * 0.65, d * 0.45, d * 0.85], up: [0, 1, 0] },
+    front: { pos: [0,  0,   d],                   up: [0, 1, 0] },
+    top:   { pos: [0,  d,   0.001],               up: [0, 0, -1] },
+    right: { pos: [d,  0,   0],                   up: [0, 1, 0] },
+    left:  { pos: [-d, 0,   0],                   up: [0, 1, 0] },
+    back:  { pos: [0,  0,  -d],                   up: [0, 1, 0] },
+  };
+  const p = presets[name] ?? presets.iso;
+  camera.position.set(...p.pos);
+  camera.up.set(...p.up);
+  controls.target.set(0, 0, 0);
+  controls.update();
+}
+
+document.querySelectorAll(".view-btn[data-view]").forEach(btn => {
+  btn.addEventListener("click", () => setView(btn.dataset.view));
+});
+
+// Keyboard shortcuts: F = fit / Home = iso, 1 = front, 7 = top, 3 = right
+document.addEventListener("keydown", (e) => {
+  if (e.target === $chatInput) return;     // don't steal chat shortcuts
+  if ($codeModal && !$codeModal.classList.contains("hidden")) return;
+  switch (e.key) {
+    case "Home": case "f": case "F":  setView("iso");   break;
+    case "1":                         setView("front");  break;
+    case "7":                         setView("top");    break;
+    case "3":                         setView("right");  break;
+    case "w": case "W":               toggleWireframe(); break;
+  }
+});
+
+// ── Wireframe toggle ──────────────────────────────────────────────────────────
+function toggleWireframe() {
+  if (!currentMesh) return;
+  wireframeMode = !wireframeMode;
+  if (wireframeMode) {
+    currentMesh.material = new THREE.MeshBasicMaterial({
+      color: 0x5b8af5, wireframe: true,
+    });
+    $wireframeBtn.classList.add("active");
+  } else {
+    currentMesh.material = baseMaterial.clone();
+    $wireframeBtn.classList.remove("active");
+  }
+}
+
+$wireframeBtn.addEventListener("click", toggleWireframe);
 
 // ── STL loading ───────────────────────────────────────────────────────────────
 const stlLoader = new STLLoader();
@@ -94,6 +208,8 @@ function loadSTL(partId) {
     currentMesh.material.dispose();
     currentMesh = null;
   }
+  wireframeMode = false;
+  $wireframeBtn.classList.remove("active");
 
   $canvas.classList.remove("hidden");
   $placeholder.classList.add("hidden");
@@ -102,25 +218,36 @@ function loadSTL(partId) {
     `/api/parts/${partId}/stl`,
     (geometry) => {
       geometry.computeVertexNormals();
-      const material = new THREE.MeshStandardMaterial({
-        color: 0x5b8af5, metalness: 0.2, roughness: 0.55,
+
+      baseMaterial = new THREE.MeshStandardMaterial({
+        color: 0x5b8af5, metalness: 0.15, roughness: 0.55,
       });
-      const mesh = new THREE.Mesh(geometry, material);
+      const mesh = new THREE.Mesh(geometry, baseMaterial);
       currentMesh = mesh;
       scene.add(mesh);
 
-      // Fit camera to geometry
-      const box = new THREE.Box3().setFromObject(mesh);
+      // Fit camera
+      const box   = new THREE.Box3().setFromObject(mesh);
+      const size  = box.getSize(new THREE.Vector3());
+      const diag  = box.getSize(new THREE.Vector3()).length();
       const center = box.getCenter(new THREE.Vector3());
-      const size = box.getSize(new THREE.Vector3()).length();
-      mesh.position.sub(center);  // center at origin
-      camera.position.set(size * 0.6, size * 0.4, size * 0.8);
-      camera.near = size * 0.001;
-      camera.far  = size * 100;
-      camera.updateProjectionMatrix();
-      controls.target.set(0, 0, 0);
-      controls.update();
 
+      mesh.position.sub(center);    // center at world origin
+
+      currentModelDiag = diag;
+      camera.near = diag * 0.001;
+      camera.far  = diag * 200;
+      camera.updateProjectionMatrix();
+
+      // Grid: snap to model bottom
+      gridHelper.visible = true;
+      gridHelper.position.y = -size.y / 2;
+
+      // Show gizmo and toolbar
+      $gizmoCanvas.classList.add("visible");
+      $viewToolbar.classList.add("visible");
+
+      setView("iso");
       updatePartInfo(partId);
     },
     undefined,
@@ -137,6 +264,7 @@ function showPlaceholder(msg = "Select a ready part to preview") {
   $placeholderText.textContent = msg;
   $partInfo.classList.remove("visible");
   $downloadBar.classList.remove("visible");
+  $dimBadge.classList.add("hidden");
 }
 
 function updatePartInfo(partId) {
@@ -147,28 +275,77 @@ function updatePartInfo(partId) {
   const lines = [];
   if (part.validation) {
     if (part.validation.volume != null) {
-      lines.push(`Volume: ${part.validation.volume.toFixed(1)} mm³`);
+      lines.push(`Vol: ${part.validation.volume.toFixed(0)} mm³`);
     }
     if (part.validation.face_count != null) {
       lines.push(`Faces: ${part.validation.face_count}`);
     }
-    if (part.validation.bbox) {
-      const [x, y, z] = part.validation.bbox.map(v => v.toFixed(1));
-      lines.push(`BBox: ${x} × ${y} × ${z} mm`);
-    }
   }
   if (part.repair_iterations > 0) {
-    lines.push(`Repairs: ${part.repair_iterations}`);
+    lines.push(`Repaired: ${part.repair_iterations}×`);
   }
-  $partInfoMeta.textContent = lines.join("\n");
+  $partInfoMeta.textContent = lines.join("   ");
   $partInfo.classList.add("visible");
+
+  // Dimension badge
+  if (part.validation && part.validation.bbox) {
+    const [bx, by, bz] = part.validation.bbox.map(v => v.toFixed(1));
+    $dimText.textContent = `${bx} × ${by} × ${bz} mm`;
+    $dimBadge.classList.remove("hidden");
+  } else {
+    $dimBadge.classList.add("hidden");
+  }
 
   $dlStep.href = `/api/parts/${partId}/step`;
   $dlStep.download = `${part.name}_${partId.slice(0, 8)}.step`;
-  $dlStl.href = `/api/parts/${partId}/stl`;
+  $dlStl.href  = `/api/parts/${partId}/stl`;
   $dlStl.download = `${part.name}_${partId.slice(0, 8)}.stl`;
   $downloadBar.classList.add("visible");
 }
+
+// ── Code Modal ────────────────────────────────────────────────────────────────
+function openCodeModal(partId) {
+  const part = state.parts[partId];
+  if (!part || !part.code) return;
+
+  $codeModalTitle.textContent = `CadQuery Code — ${part.name}`;
+
+  // Reset highlight state, then apply
+  $codeContent.textContent = part.code;
+  $codeContent.removeAttribute("data-highlighted");
+  $codeContent.className = "language-python";
+  if (window.hljs) {
+    hljs.highlightElement($codeContent);
+  }
+  $codeModal.classList.remove("hidden");
+}
+
+function closeCodeModal() {
+  $codeModal.classList.add("hidden");
+}
+
+$codeBtn.addEventListener("click", () => {
+  if (state.activePart) openCodeModal(state.activePart);
+});
+$codeModalClose.addEventListener("click", closeCodeModal);
+$codeModal.addEventListener("click", (e) => { if (e.target === $codeModal) closeCodeModal(); });
+
+$codeCopyBtn.addEventListener("click", () => {
+  const part = state.activePart ? state.parts[state.activePart] : null;
+  if (!part || !part.code) return;
+  navigator.clipboard.writeText(part.code).then(() => {
+    $codeCopyBtn.textContent = "Copied!";
+    setTimeout(() => { $codeCopyBtn.textContent = "Copy"; }, 1800);
+  }).catch(() => {
+    $codeCopyBtn.textContent = "Failed";
+    setTimeout(() => { $codeCopyBtn.textContent = "Copy"; }, 1800);
+  });
+});
+
+// Escape closes modal
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closeCodeModal();
+});
 
 // ── Parts Shelf ───────────────────────────────────────────────────────────────
 function renderShelf() {
@@ -188,6 +365,7 @@ function renderShelf() {
 
     const time = new Date(part.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     const spinnerHtml = isInProgress(part.status) ? `<span class="spinner"></span>` : "";
+    const pipelineHtml = buildPipelineSteps(part);
 
     li.innerHTML = `
       <span class="part-name">${escHtml(part.name)}</span>
@@ -195,11 +373,38 @@ function renderShelf() {
       <div class="part-status-row">
         ${spinnerHtml}<span class="part-badge badge-${part.status}">${part.status}</span>
         <span class="part-time">${time}</span>
-      </div>`;
+      </div>
+      ${pipelineHtml}`;
 
     li.addEventListener("click", () => selectPart(part.id));
     $partsList.appendChild(li);
   }
+}
+
+/**
+ * Build a mini pipeline-steps indicator for the part shelf.
+ * Steps: Plan → Code → Run → Validate [→ Repair]
+ */
+function buildPipelineSteps(part) {
+  const stages = ["Plan", "Code", "Run", "Validate"];
+  const statusOrder = { generating: 1, validating: 3, repairing: 4, ready: 5, failed: -1 };
+  const progress = statusOrder[part.status] ?? 0;
+
+  const steps = stages.map((label, idx) => {
+    const stepNum = idx + 1;
+    let cls = "";
+    if (part.status === "failed")   cls = stepNum <= progress - 1 ? "done" : stepNum === progress ? "error" : "";
+    else if (stepNum < progress)    cls = "done";
+    else if (stepNum === progress)  cls = part.status === "ready" ? "done" : "active";
+    return `<span class="pipeline-step ${cls}">${label}</span>`;
+  });
+
+  if (part.repair_iterations > 0) {
+    const repairCls = part.status === "ready" ? "done" : part.status === "repairing" ? "active" : "";
+    steps.push(`<span class="pipeline-step ${repairCls}">Repair×${part.repair_iterations}</span>`);
+  }
+
+  return `<div class="pipeline-steps">${steps.join("")}</div>`;
 }
 
 function isInProgress(status) {
@@ -215,7 +420,8 @@ function selectPart(id) {
   if (part.status === "ready") {
     loadSTL(id);
   } else if (part.status === "failed") {
-    showPlaceholder("Generation failed — see chat for details");
+    // Show error details in viewport
+    showPlaceholder(part.error ? `Failed: ${part.error.slice(0, 120)}` : "Generation failed — see chat for details");
     $partInfo.classList.remove("visible");
     $downloadBar.classList.remove("visible");
   } else {
@@ -237,7 +443,6 @@ function connectSSE() {
   es.onerror = () => {
     $connStatus.className = "status-dot disconnected";
     $connStatus.title = "Disconnected — retrying…";
-    // Browser auto-reconnects EventSource; clean up and let it retry
   };
 
   es.onmessage = (e) => {
@@ -247,7 +452,6 @@ function connectSSE() {
     const { type, data } = event;
 
     if (type === "connected") {
-      // Initial handshake; load current parts
       fetchParts();
       return;
     }
@@ -256,12 +460,12 @@ function connectSSE() {
       const part = state.parts[data.id];
       if (part) {
         part.status = data.status;
+        if (data.repair_iterations != null) part.repair_iterations = data.repair_iterations;
         renderShelf();
-        // If this part is currently selected, update placeholder text
         if (state.activePart === data.id && data.status !== "ready") {
           showPlaceholder(`Part is ${data.status}…`);
         }
-        appendStatusMsg(`Part "${part.name}" — ${data.status}`);
+        appendStatusMsg(`"${part.name}" — ${data.status}`);
       }
       return;
     }
@@ -269,8 +473,7 @@ function connectSSE() {
     if (type === "part.ready") {
       state.parts[data.id] = data;
       renderShelf();
-      appendStatusMsg(`"${data.name}" ready`);
-      // Auto-select if this is the first ready part or already selected
+      appendStatusMsg(`"${data.name}" ready ✓`);
       if (state.activePart === data.id) {
         loadSTL(data.id);
       } else if (!state.activePart) {
@@ -284,7 +487,7 @@ function connectSSE() {
       renderShelf();
       appendStatusMsg(`"${data.name}" failed: ${data.error || "unknown error"}`, "error");
       if (state.activePart === data.id) {
-        showPlaceholder("Generation failed");
+        showPlaceholder(data.error ? `Failed: ${data.error.slice(0, 120)}` : "Generation failed");
       }
       return;
     }
@@ -296,9 +499,7 @@ async function fetchParts() {
   try {
     const r = await fetch("/api/parts");
     const parts = await r.json();
-    for (const p of parts) {
-      state.parts[p.id] = p;
-    }
+    for (const p of parts) state.parts[p.id] = p;
     renderShelf();
   } catch (err) {
     console.warn("fetchParts error:", err);
@@ -327,11 +528,10 @@ $chatForm.addEventListener("submit", async (e) => {
       appendMessage("error", `Error ${r.status}: ${err.detail || r.statusText}`);
     } else {
       const data = await r.json();
-      // Part will arrive via SSE; add it to state immediately as "generating"
       state.parts[data.part_id] = {
         id: data.part_id, name: msg.slice(0, 40), prompt: msg,
         status: "generating", created_at: new Date().toISOString(),
-        validation: null, exports: {}, repair_iterations: 0, error: null,
+        code: null, validation: null, exports: {}, repair_iterations: 0, error: null,
       };
       renderShelf();
       if (!state.activePart) {
