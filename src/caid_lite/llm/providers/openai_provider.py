@@ -2,9 +2,6 @@
 
 Configuration:
   OPENAI_API_KEY — required at generate() time
-
-Phase 1 status: interface stub — generate() raises NotImplementedError.
-Full implementation planned for a future phase once Qwen baseline is complete.
 """
 
 from __future__ import annotations
@@ -16,6 +13,10 @@ from ..base import LLMConfig
 
 if TYPE_CHECKING:
     from openai import OpenAI as _OpenAI
+
+_PLACEHOLDER_KEYS = frozenset({
+    "", "none", "sk-placeholder", "your_openai_key_here", "placeholder",
+})
 
 
 class OpenAIBackend:
@@ -35,16 +36,24 @@ class OpenAIBackend:
     # ------------------------------------------------------------------
 
     def generate(self, user_prompt: str, system_prompt: str) -> str:
-        raise NotImplementedError(
-            "OpenAIBackend.generate() is not yet implemented. "
-            "Use provider='qwen' or provider='local' for now."
+        """Call the OpenAI chat completions endpoint and return raw text."""
+        client = self._get_client()
+        response = client.chat.completions.create(
+            model=self._config.model,
+            temperature=self._config.temperature,
+            max_tokens=self._config.max_tokens,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
         )
+        return response.choices[0].message.content or ""
 
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _get_client(self) -> "_OpenAI":  # pragma: no cover
+    def _get_client(self) -> "_OpenAI":
         if self._client is not None:
             return self._client
 
@@ -56,11 +65,14 @@ class OpenAIBackend:
                 "Install it with: pip install openai"
             ) from exc
 
-        api_key = self._config.api_key or os.getenv("OPENAI_API_KEY")
-        if not api_key:
+        api_key = self._config.api_key or os.getenv("OPENAI_API_KEY", "")
+        if not api_key or api_key.lower() in _PLACEHOLDER_KEYS:
             raise EnvironmentError(
-                "OPENAI_API_KEY is not set. "
-                "Export it as an environment variable or pass api_key in LLMConfig."
+                "OPENAI_API_KEY is not set or contains a placeholder value.\n"
+                "Steps to fix:\n"
+                "  1. Open .env in the project root\n"
+                "  2. Set OPENAI_API_KEY=sk-...\n"
+                "  3. Get a key at: https://platform.openai.com/api-keys"
             )
 
         self._client = OpenAI(api_key=api_key)

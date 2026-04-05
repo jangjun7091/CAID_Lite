@@ -24,6 +24,12 @@ if TYPE_CHECKING:
 
 _DEFAULT_API_BASE = "https://dashscope.aliyuncs.com/compatible-mode/v1"
 
+# Keys that must never be treated as real credentials.
+_PLACEHOLDER_KEYS = frozenset({
+    "", "none", "your_dashscope_key_here", "your_api_key_here",
+    "sk-placeholder", "placeholder", "changeme",
+})
+
 
 class QwenBackend:
     """Qwen3-Coder via an OpenAI-compatible ``/v1/chat/completions`` endpoint.
@@ -71,11 +77,16 @@ class QwenBackend:
                 "Install it with: pip install openai"
             ) from exc
 
-        api_key = self._config.api_key or os.getenv("QWEN_API_KEY")
-        if not api_key:
+        api_key = self._config.api_key or os.getenv("QWEN_API_KEY", "")
+        if not api_key or api_key.lower() in _PLACEHOLDER_KEYS:
             raise EnvironmentError(
-                "QWEN_API_KEY is not set. "
-                "Export it as an environment variable or pass api_key in LLMConfig."
+                "QWEN_API_KEY is not set or contains a placeholder value.\n"
+                "Steps to fix:\n"
+                "  1. Open .env in the project root\n"
+                "  2. Replace 'your_dashscope_key_here' with your real DashScope key\n"
+                "  3. International endpoint: "
+                "https://dashscope-intl.aliyuncs.com/compatible-mode/v1\n"
+                "  4. Get a key at: https://www.alibabacloud.com/product/dashscope"
             )
 
         api_base = (

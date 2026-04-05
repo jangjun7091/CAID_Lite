@@ -294,28 +294,43 @@ class CADPipeline:
         critic_dict: Optional[Dict[str, Any]] = None
         plan: DesignPlan = DesignPlan()
 
-        if multi_agent:
-            # Stage 1a: Architect -- NL prompt -> DesignPlan
-            _log.info(f"[{run_id[:8]}] Architect: planning")
-            plan = self._architect.plan(prompt)  # type: ignore[union-attr]
-            design_plan_dict = plan.to_dict()
+        try:
+            if multi_agent:
+                # Stage 1a: Architect -- NL prompt -> DesignPlan
+                _log.info(f"[{run_id[:8]}] Architect: planning")
+                plan = self._architect.plan(prompt)  # type: ignore[union-attr]
+                design_plan_dict = plan.to_dict()
 
-            # Stage 1b: PatternSelector -- DesignPlan -> patterns
-            patterns = self._pattern_selector.select(plan)  # type: ignore[union-attr]
-            _log.info(
-                f"[{run_id[:8]}] PatternSelector: "
-                f"{len(patterns)} pattern(s) selected"
-            )
+                # Stage 1b: PatternSelector -- DesignPlan -> patterns
+                patterns = self._pattern_selector.select(plan)  # type: ignore[union-attr]
+                _log.info(
+                    f"[{run_id[:8]}] PatternSelector: "
+                    f"{len(patterns)} pattern(s) selected"
+                )
 
-            # Stage 1c: Designer -- plan + patterns -> raw LLM response
-            _log.info(f"[{run_id[:8]}] Designer: generating code")
-            raw_response = self._designer.generate(prompt, plan, patterns)  # type: ignore[union-attr]
-        else:
-            system_prompt, user_prompt = self._prompt_builder.build_generation_prompt(
-                prompt
+                # Stage 1c: Designer -- plan + patterns -> raw LLM response
+                _log.info(f"[{run_id[:8]}] Designer: generating code")
+                raw_response = self._designer.generate(prompt, plan, patterns)  # type: ignore[union-attr]
+            else:
+                system_prompt, user_prompt = self._prompt_builder.build_generation_prompt(
+                    prompt
+                )
+                _log.info(f"[{run_id[:8]}] Calling LLM ({self._llm!r})")
+                raw_response = self._llm.generate(user_prompt, system_prompt)
+
+        except Exception as exc:
+            elapsed = time.monotonic() - start
+            error_msg = f"LLM error: {type(exc).__name__}: {exc}"
+            _log.error(f"[{run_id[:8]}] {error_msg}")
+            return PipelineResult(
+                run_id=run_id,
+                success=False,
+                prompt=prompt,
+                generated_code="",
+                elapsed_s=round(elapsed, 3),
+                error=error_msg,
+                design_plan=design_plan_dict,
             )
-            _log.info(f"[{run_id[:8]}] Calling LLM ({self._llm!r})")
-            raw_response = self._llm.generate(user_prompt, system_prompt)
 
         # ── Step 2: Extract code from markdown response ───────────────
         code = self._extract_code(raw_response)
@@ -323,19 +338,24 @@ class CADPipeline:
 
         # ── Step 1d (multi-agent): Critic review ──────────────────────────
         if multi_agent:
-            _log.info(f"[{run_id[:8]}] Critic: reviewing code")
-            critic_result = self._critic.review(prompt, plan, code)  # type: ignore[union-attr]
-            critic_dict = critic_result.to_dict()
-            if not critic_result.approved and critic_result.revised_code:
-                _log.info(
-                    f"[{run_id[:8]}] Critic: code revised "
-                    f"({critic_result.feedback[:80]})"
-                )
-                code = critic_result.revised_code
-            elif not critic_result.approved:
+            try:
+                _log.info(f"[{run_id[:8]}] Critic: reviewing code")
+                critic_result = self._critic.review(prompt, plan, code)  # type: ignore[union-attr]
+                critic_dict = critic_result.to_dict()
+                if not critic_result.approved and critic_result.revised_code:
+                    _log.info(
+                        f"[{run_id[:8]}] Critic: code revised "
+                        f"({critic_result.feedback[:80]})"
+                    )
+                    code = critic_result.revised_code
+                elif not critic_result.approved:
+                    _log.warning(
+                        f"[{run_id[:8]}] Critic: issues found but no revision provided. "
+                        f"Proceeding with original code."
+                    )
+            except Exception as exc:
                 _log.warning(
-                    f"[{run_id[:8]}] Critic: issues found but no revision provided. "
-                    f"Proceeding with original code."
+                    f"[{run_id[:8]}] Critic failed ({exc}); proceeding with original code."
                 )
 
         # ── Step 3: Execute in sandbox ────────────────────────────────

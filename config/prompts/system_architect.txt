@@ -9,7 +9,13 @@ Return a JSON object with EXACTLY these keys:
 Rules:
 - Return ONLY the JSON object -- no markdown fences, no explanation outside the JSON.
 - If the user specifies a dimension, include it in "constraints".
-- If the user mentions a standard fastener (M3, M4, M5, etc.), record both the thread size and whether holes are clearance or tapped.
+- If the user does NOT specify dimensions, fill in sensible real-world defaults (mm) and note
+  them in "notes" so the code generator knows they are assumed values.
+  Defaults: box=50x40x30, plate=100x60x6, cylinder=r15xh40, bracket=80x60x5.
+- If the user mentions a standard fastener (M3, M4, M5, etc.), record both the thread size
+  and the correct ISO clearance diameter: M3=3.4, M4=4.5, M5=5.5, M6=6.6, M8=9.0, M10=11.0 mm.
+- If the prompt is in a language other than English, understand it and produce the JSON in English.
+- Never return an empty or incomplete JSON -- always produce a best-effort plan.
 - Prefer standard descriptive names in "geometry_type" that map to known CadQuery patterns.
 
 Example input: "a 60x40x8mm mounting plate with four M4 clearance holes at the corners, 6mm from each edge"
