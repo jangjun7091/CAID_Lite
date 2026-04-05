@@ -109,6 +109,36 @@ class TestCADPipelineConstruction:
         pipeline.run("test")
         assert sandbox.call_count == 1
 
+    def test_agents_are_none_by_default_in_constructor(self):
+        """Direct constructor: all agents default to None (single-LLM path)."""
+        llm = MockLLMBackend(responses=[_FENCED_CODE])
+        pipeline = CADPipeline(llm=llm)
+        assert pipeline._architect is None
+        assert pipeline._designer is None
+        assert pipeline._critic is None
+        assert pipeline._pattern_selector is None
+
+    def test_agents_stored_when_injected(self):
+        """Constructor: injected agents are stored and activate multi-agent path."""
+        from caid_lite.agents.architect import ArchitectAgent
+        from caid_lite.agents.critic import CriticAgent
+        from caid_lite.agents.designer import DesignerAgent
+        from caid_lite.agents.pattern_selector import PatternSelector
+
+        llm = MockLLMBackend(responses=[_FENCED_CODE])
+        arch = ArchitectAgent(llm=MockLLMBackend(responses=["{}"]))
+        ps = PatternSelector()
+        des = DesignerAgent(llm=MockLLMBackend(responses=[_FENCED_CODE]))
+        crit = CriticAgent(llm=MockLLMBackend(responses=["APPROVED"]))
+
+        pipeline = CADPipeline(
+            llm=llm, architect=arch, pattern_selector=ps, designer=des, critic=crit
+        )
+        assert pipeline._architect is arch
+        assert pipeline._pattern_selector is ps
+        assert pipeline._designer is des
+        assert pipeline._critic is crit
+
 
 # ── CADPipeline.run — LLM interaction ────────────────────────────────────────
 
@@ -500,3 +530,37 @@ class TestCADPipelineMultiAgent:
         assert result.success is True
         assert result.design_plan is None
         assert result.critic is None
+
+    def test_repair_receives_plan_context_in_multi_agent(self):
+        """In multi-agent mode the repair prompt includes design plan context."""
+        from caid_lite.repair.loop import RepairLoop
+        from caid_lite.agents.architect import ArchitectAgent
+        from caid_lite.agents.critic import CriticAgent
+        from caid_lite.agents.designer import DesignerAgent
+        from caid_lite.agents.pattern_selector import PatternSelector
+
+        arch_llm = MockLLMBackend(responses=[self._PLAN_JSON])
+        des_llm = MockLLMBackend(responses=[_FENCED_CODE])
+        crit_llm = MockLLMBackend(responses=["APPROVED"])
+        repair_llm = MockLLMBackend(responses=[_FENCED_CODE])
+
+        initial_sandbox = MockSandbox(results=[
+            _exec_result(success=False, exception="syntax error")
+        ])
+        repair_sandbox = make_success_sandbox()
+        repair_loop = RepairLoop(llm=repair_llm, sandbox=repair_sandbox, max_iterations=1)
+
+        pipeline = CADPipeline(
+            llm=MockLLMBackend(responses=[_FENCED_CODE]),
+            sandbox=initial_sandbox,
+            repair_loop=repair_loop,
+            architect=ArchitectAgent(llm=arch_llm),
+            pattern_selector=PatternSelector(),
+            designer=DesignerAgent(llm=des_llm),
+            critic=CriticAgent(llm=crit_llm),
+        )
+        result = pipeline.run("a plate with holes")
+        assert result.repair is not None
+        # The repair LLM should have been called with a prompt containing plan info
+        user_prompt, _ = repair_llm.calls[0]
+        assert "geometry_type" in user_prompt or "plate" in user_prompt

@@ -200,9 +200,12 @@ class CADPipeline:
     ) -> "CADPipeline":
         """Build a fully-wired pipeline from a YAML config file.
 
-        Creates ``Sandbox``, ``GeometryValidator``, and ``RepairLoop`` from
-        the config.  The same ``llm`` and ``sandbox`` instances are shared
-        between the pipeline and the repair loop.
+        Multi-agent mode (Architect + PatternSelector + Designer + Critic) is
+        **enabled by default**.  Set ``agents.enabled: false`` in
+        ``config/default.yaml`` to fall back to the single-LLM path.
+
+        All four agents share the same ``LLMBackend`` instance so no extra
+        API credentials are required.
 
         Args:
             config_path: Path to ``default.yaml`` (absolute or relative to CWD).
@@ -247,11 +250,41 @@ class CADPipeline:
             max_iterations=max_attempts,
         )
 
+        # ── Multi-agent setup (default: enabled) ──────────────────────────
+        agents_cfg = data.get("agents", {})
+        agents_enabled = agents_cfg.get("enabled", True)  # on by default
+
+        architect = None
+        pattern_selector = None
+        designer = None
+        critic = None
+
+        if agents_enabled:
+            from .agents.architect import ArchitectAgent
+            from .agents.pattern_selector import PatternSelector
+            from .agents.designer import DesignerAgent
+            from .agents.critic import CriticAgent
+
+            architect = ArchitectAgent(llm=llm)
+            pattern_selector = PatternSelector()
+            designer = DesignerAgent(llm=llm)
+            critic = CriticAgent(llm=llm)
+            _log.info(
+                "Mode         : multi-agent "
+                "(Architect + PatternSelector + Designer + Critic)"
+            )
+        else:
+            _log.info("Mode         : single-LLM (agents.enabled=false)")
+
         return cls(
             llm=llm,
             sandbox=sandbox,
             validator=validator,
             repair_loop=repair_loop,
+            architect=architect,
+            pattern_selector=pattern_selector,
+            designer=designer,
+            critic=critic,
         )
 
     # ------------------------------------------------------------------
@@ -385,9 +418,22 @@ class CADPipeline:
             else:
                 initial_error = exec_result.exception or "Unknown execution error."
 
+            # In multi-agent mode enrich the repair prompt with the structured
+            # plan so the LLM understands the original intent precisely.
+            repair_prompt = prompt
+            if multi_agent and design_plan_dict:
+                plan = design_plan_dict
+                repair_prompt = (
+                    f"{prompt}\n\n"
+                    f"[Structured design plan: "
+                    f"geometry_type={plan.get('geometry_type', '')}, "
+                    f"features={plan.get('features', [])}, "
+                    f"constraints={plan.get('constraints', {})}]"
+                )
+
             _log.info(f"[{run_id[:8]}] Starting repair loop")
             repair_result = self._repair_loop.run(
-                prompt, code, initial_error, run_id_prefix=run_id
+                repair_prompt, code, initial_error, run_id_prefix=run_id
             )
 
             if repair_result.repaired and repair_result.final_exec_result:

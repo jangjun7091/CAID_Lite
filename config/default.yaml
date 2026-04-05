@@ -6,6 +6,11 @@ llm:
   temperature: 0.2
   max_tokens: 4096
 
+agents:
+  # Multi-agent mode: Architect -> PatternSelector -> Designer -> Critic
+  # Set enabled: false to fall back to the single-LLM path (not recommended).
+  enabled: true
+
 executor:
   timeout_s: 60
 
