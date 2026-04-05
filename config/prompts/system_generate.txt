@@ -135,6 +135,24 @@ def build_model():
     return cq.Workplane("XY").box(width, height, depth)
 ```
 
+Hollow cylinders (cups, tumblers, containers, cans):
+- NEVER use .shell() on a cylinder -- it is unreliable in CadQuery and produces geometry errors.
+- Use .circle(inner_r).cutBlind(-bore_depth) to create the inner cavity.
+  bore_depth = height - bottom_wall_mm   (leaves a closed bottom)
+- For a through-bore (open both ends), use .hole(inner_dia) instead of .cutBlind().
+- inner_r = (outer_dia / 2) - wall_mm  -- verify wall_mm >= 1.5 and bore_depth < height.
+
+Rounded rectangular slabs (phones, remotes, tablets, enclosures):
+- Use .box(w, h, t).edges("|Z").fillet(corner_r) for vertical corner rounding.
+- corner_r must be strictly less than thickness / 2 AND less than min(w, h) / 2.
+- Apply fillet LAST -- after all pockets, holes, and bosses.
+- Do NOT use .edges("all").fillet() -- select "|Z" for vertical corners only.
+
+Multi-body union (mug handle, attachments):
+- Build each body separately on its own Workplane.
+- Use .translate((dx, dy, dz)) to position, then .union() to combine.
+- Do NOT use cq.Assembly for simple two-body unions.
+
 Example -- spur gear (trapezoidal tooth approximation, safe polyline approach):
 
 ```python
@@ -171,4 +189,49 @@ def build_model():
         .faces(">Z").workplane()
         .hole(bore_dia_mm)
     )
+```
+
+Example -- coffee mug (hollow cylinder body + rectangular loop handle):
+
+```python
+import cadquery as cq
+
+
+def build_model():
+    # Mug: hollow cylinder body + rectangular loop handle joined with .union()
+    outer_dia = 85.0   # mm -- outer diameter
+    height    = 95.0   # mm -- total height
+    wall_mm   = 5.0    # mm -- wall and bottom thickness
+
+    inner_r    = (outer_dia / 2) - wall_mm
+    bore_depth = height - wall_mm   # leaves closed bottom
+
+    # Handle dimensions
+    handle_outer_h = 55.0   # mm -- loop outer height (along Z)
+    handle_outer_w = 28.0   # mm -- loop outer radial depth
+    handle_t       = 8.0    # mm -- cross-section thickness
+    handle_inner_h = 40.0   # mm -- grip opening height
+    handle_inner_w = 12.0   # mm -- grip opening width
+
+    # Cup body: hollow cylinder with closed bottom
+    cup = (
+        cq.Workplane("XY")
+        .cylinder(height, outer_dia / 2)
+        .faces(">Z").workplane()
+        .circle(inner_r).cutBlind(-bore_depth)
+    )
+
+    # Handle: rectangular frame (box + rectangular through-cut)
+    handle = (
+        cq.Workplane("YZ")
+        .box(handle_outer_h, handle_t, handle_outer_w)
+        .faces(">Z").workplane()
+        .rect(handle_inner_h, handle_inner_w).cutThruAll()
+    )
+
+    # Position handle flush against cup side, centred at mid-height
+    dx = outer_dia / 2 + handle_outer_w / 2 - handle_t / 2
+    handle = handle.translate((dx, 0, height / 2))
+
+    return cup.union(handle)
 ```

@@ -1,0 +1,60 @@
+name: rounded_box
+category: solid
+purpose: "Rectangular slab with rounded vertical corners; base shape for phones, remotes, tablets, and slim enclosures."
+
+when_to_use: >-
+  Use when the user requests a smartphone, iPhone, Android phone, tablet, remote
+  control, card reader, key fob, or any slim rectangular object with rounded corners.
+  The fillet is applied only to the four vertical edges (|Z) to produce the characteristic
+  rounded-rectangle silhouette seen on consumer electronics.
+
+idiom: |
+  width          = 75.0
+  height         = 150.0
+  thickness      = 8.0
+  corner_radius  = 10.0
+
+  cq.Workplane("XY")
+  .box(width, height, thickness)
+  .edges("|Z").fillet(corner_radius)
+
+avoid:
+  - "Do NOT use .shell() to create a screen recess -- use .faces('>Z').workplane().rect(w,h).cutBlind(-d) instead"
+  - "corner_radius must be < thickness / 2 AND < min(width, height) / 2 -- otherwise OCC fillet fails"
+  - "Do NOT apply .fillet() before holes, ports, or pockets -- always fillet LAST"
+  - "Do NOT use .edges('all').fillet() -- select '|Z' for vertical corners only"
+  - "Do NOT use .shell() on the result -- it produces unreliable geometry for thin rectangular parts"
+
+parameters:
+  width_mm:         {type: float, unit: mm, description: "Short dimension of the rectangle (X axis)"}
+  height_mm:        {type: float, unit: mm, description: "Long dimension of the rectangle (Y axis)"}
+  thickness_mm:     {type: float, unit: mm, description: "Slab thickness (Z axis)"}
+  corner_radius_mm: {type: float, unit: mm, description: "Radius of vertical corner fillets; must be < thickness/2"}
+  edge_radius_mm:   {type: float, unit: mm, description: "Optional top/bottom face edge fillet radius (smaller than corner_radius)"}
+
+example: |
+  import cadquery as cq
+
+
+  def build_model():
+      """Smartphone-sized rounded rectangle slab (iPhone proportions)."""
+      width          = 75.0    # mm
+      height         = 150.0   # mm
+      thickness      = 8.0     # mm
+      corner_radius  = 10.0    # mm -- vertical corner rounding
+      edge_radius    = 2.0     # mm -- top/bottom edge softening (optional)
+
+      result = (
+          cq.Workplane("XY")
+          .box(width, height, thickness)
+          .edges("|Z").fillet(corner_radius)
+          .edges(">Z or <Z").fillet(edge_radius)
+      )
+      return result
+
+repair_hints:
+  - "Fillet failed: corner_radius must be strictly less than thickness/2 and less than min(width,height)/2."
+  - "Apply .edges('|Z').fillet() BEFORE .edges('>Z').fillet() -- fillet top/bottom edges last."
+  - "If only corner rounding is needed, omit the .edges('>Z or <Z').fillet() line entirely."
+  - "For a screen recess: .faces('>Z').workplane().rect(screen_w, screen_h).cutBlind(-recess_depth)."
+  - "For a camera bump: .faces('>Z').workplane().center(dx, dy).circle(r).extrude(bump_h)."

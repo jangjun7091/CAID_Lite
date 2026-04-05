@@ -1,0 +1,66 @@
+name: hollow_cylinder
+category: solid
+purpose: "Hollow cylindrical container with closed bottom; base shape for tumblers, travel cups, bottles, cans, and cylindrical vessels."
+
+when_to_use: >-
+  Use when the user requests a tumbler, travel mug body, water bottle, cylindrical
+  container, can, jar, or any hollow rotational part with a closed bottom and open top.
+  The inner cavity is created with .circle().cutBlind() rather than .shell() because
+  .shell() is unreliable on cylinders in CadQuery.
+
+idiom: |
+  outer_dia      = 85.0
+  height         = 200.0
+  wall_mm        = 3.0
+  bottom_wall_mm = 4.0
+
+  inner_r    = (outer_dia - 2 * wall_mm) / 2
+  bore_depth = height - bottom_wall_mm   # leaves closed bottom
+
+  cq.Workplane("XY")
+  .cylinder(height, outer_dia / 2)
+  .faces(">Z").workplane()
+  .circle(inner_r).cutBlind(-bore_depth)
+
+avoid:
+  - "NEVER use .shell() on a cylinder -- it is unreliable in CadQuery and causes geometry errors"
+  - "Do NOT use .hole(inner_dia) for a closed-bottom vessel -- .hole() cuts all the way through"
+  - "Do NOT use .shell(-wall_t) -- use .circle(inner_r).cutBlind(-bore_depth) instead"
+  - "wall_mm must be >= 1.5 mm -- thinner walls risk export failure and mesh errors"
+  - "bore_depth must be < height -- always leave bottom_wall_mm >= 2 mm"
+  - "inner_r must be > 0: inner_r = (outer_dia - 2 * wall_mm) / 2 must be positive"
+
+parameters:
+  outer_dia_mm:    {type: float, unit: mm, description: "Outer diameter of the cylinder"}
+  height_mm:       {type: float, unit: mm, description: "Total height of the vessel"}
+  wall_mm:         {type: float, unit: mm, description: "Side wall thickness; minimum 1.5 mm"}
+  bottom_wall_mm:  {type: float, unit: mm, description: "Bottom wall thickness; minimum 2 mm"}
+
+example: |
+  import cadquery as cq
+
+
+  def build_model():
+      """Tumbler / travel cup: hollow cylinder with closed bottom."""
+      outer_dia      = 85.0   # mm -- outer diameter
+      height         = 200.0  # mm -- total height
+      wall_mm        = 3.0    # mm -- side wall thickness
+      bottom_wall_mm = 4.0    # mm -- bottom wall thickness
+
+      inner_r    = (outer_dia - 2 * wall_mm) / 2
+      bore_depth = height - bottom_wall_mm
+
+      return (
+          cq.Workplane("XY")
+          .cylinder(height, outer_dia / 2)
+          .faces(">Z").workplane()
+          .circle(inner_r).cutBlind(-bore_depth)
+      )
+
+repair_hints:
+  - "If inner cavity is missing: ensure .faces('>Z').workplane() is called before .circle().cutBlind()."
+  - "If bore goes all the way through: use .cutBlind(-bore_depth) not .hole() or .cutThruAll()."
+  - "bore_depth = height - bottom_wall_mm -- verify bottom_wall_mm >= 2."
+  - "inner_r = (outer_dia / 2) - wall_mm -- verify wall_mm >= 1.5."
+  - "If .shell() was used instead: replace entirely with .circle(inner_r).cutBlind(-bore_depth)."
+  - "For a lid groove: .faces('>Z').workplane().circle(outer_r - 1).circle(outer_r - wall_mm - 1).cutBlind(-lid_depth)."

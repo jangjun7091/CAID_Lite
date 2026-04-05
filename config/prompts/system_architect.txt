@@ -22,6 +22,21 @@ Rules:
     module_mm=2.5, num_teeth=20, thickness_mm=10, bore_dia_mm=10.
   Pitch diameter = module * num_teeth (e.g. module=2.5, 20 teeth -> pitch_dia=50 mm).
   If the user gives only outer diameter D, derive: num_teeth = round(D / module) - 2.
+- Common everyday objects -- use these geometry_type values and defaults when not stated:
+    phone / smartphone / iphone / 폰 / 아이폰 / 스마트폰:
+        geometry_type="rounded_box",
+        constraints: width_mm=75, height_mm=150, thickness_mm=8, corner_radius_mm=10
+    power_strip / 멀티탭 / outlet strip / surge protector:
+        geometry_type="power_strip",
+        constraints: length_mm=300, width_mm=65, thickness_mm=35, num_sockets=6,
+                     socket_dia_mm=18, socket_spacing_mm=40, cord_dia_mm=12
+    tumbler / 텀블러 / travel cup / cylindrical container:
+        geometry_type="hollow_cylinder",
+        constraints: outer_dia_mm=85, height_mm=200, wall_mm=3, bottom_wall_mm=4
+    mug / 머그컵 / coffee mug / tea cup / cup with handle:
+        geometry_type="mug",
+        constraints: outer_dia_mm=85, height_mm=95, wall_mm=5,
+                     handle_outer_h_mm=55, handle_outer_w_mm=28, handle_t_mm=8
 
 Operations array rules:
 - List every CadQuery step in the exact order the code must execute them.

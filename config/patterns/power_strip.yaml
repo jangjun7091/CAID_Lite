@@ -1,0 +1,73 @@
+name: power_strip
+category: assembly
+purpose: "Power strip / multi-outlet surge protector housing: rectangular box with regularly spaced circular socket holes on the top face and an optional cord exit hole on the end face."
+
+when_to_use: >-
+  Use when the user requests a power strip, multi-tap, surge protector, extension
+  cord block, outlet strip, or any rectangular enclosure with a row of circular
+  holes representing electrical sockets. The sockets are modelled as circular
+  through-holes using .rarray().hole() on the top face.
+
+idiom: |
+  length          = 300.0
+  width           = 65.0
+  thickness       = 35.0
+  num_sockets     = 6
+  socket_dia      = 18.0
+  socket_spacing  = 40.0
+  cord_dia        = 12.0
+
+  cq.Workplane("XY")
+  .box(length, width, thickness)
+  .faces(">Z").workplane()
+  .rarray(socket_spacing, 1, num_sockets, 1)
+  .hole(socket_dia)
+  .faces("<X").workplane()
+  .hole(cord_dia)
+
+avoid:
+  - "Do NOT use .shell() -- the housing is a solid body with drilled holes, not a thin shell"
+  - "socket_dia must be < width to prevent the hole from exceeding the housing boundary"
+  - "socket_spacing * (num_sockets - 1) must be < length -- sockets must fit within the body"
+  - "Do NOT use .pushPoints() for evenly spaced sockets -- use .rarray() for uniform spacing"
+  - "Do NOT use .eachpoint() -- causes Wire type errors"
+
+parameters:
+  length_mm:        {type: float, unit: mm, description: "Total length of the strip (X axis)"}
+  width_mm:         {type: float, unit: mm, description: "Width of the strip housing (Y axis)"}
+  thickness_mm:     {type: float, unit: mm, description: "Height / thickness of the housing (Z axis)"}
+  num_sockets:      {type: int,   unit: count, description: "Number of socket holes in the row"}
+  socket_dia_mm:    {type: float, unit: mm, description: "Diameter of each socket hole; must be < width_mm"}
+  socket_spacing_mm:{type: float, unit: mm, description: "Centre-to-centre spacing between sockets"}
+  cord_dia_mm:      {type: float, unit: mm, description: "Diameter of the power cord exit hole on the end face"}
+
+example: |
+  import cadquery as cq
+
+
+  def build_model():
+      """6-socket power strip with cord exit hole."""
+      length         = 300.0   # mm
+      width          = 65.0    # mm
+      thickness      = 35.0    # mm
+      num_sockets    = 6
+      socket_dia     = 18.0    # mm
+      socket_spacing = 40.0    # mm  (centre-to-centre)
+      cord_dia       = 12.0    # mm
+
+      return (
+          cq.Workplane("XY")
+          .box(length, width, thickness)
+          .faces(">Z").workplane()
+          .rarray(socket_spacing, 1, num_sockets, 1)
+          .hole(socket_dia)
+          .faces("<X").workplane()
+          .hole(cord_dia)
+      )
+
+repair_hints:
+  - "socket_dia must be < width_mm; if sockets are too wide reduce socket_dia or increase width."
+  - "socket_spacing * (num_sockets - 1) must be < length -- reduce num_sockets or spacing if overflow."
+  - "If sockets are misaligned: .rarray(x_spacing, y_spacing, n_cols, n_rows) -- use n_rows=1 for single row."
+  - "cord_dia must be < min(width, thickness) to fit on the end face."
+  - "If .faces('<X') fails: the face selector selects the face with the most negative X normal; use .faces('>X') for the opposite end."
