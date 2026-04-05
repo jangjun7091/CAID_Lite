@@ -20,6 +20,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request as StarletteRequest
 
 from ..pipeline import CADPipeline
 from ..session.manager import SessionManager
@@ -28,6 +30,22 @@ from .routes import chat, events, parts, workspace
 # Resolve GUI static directory relative to this file (works whether installed
 # or run in-place from the project root).
 _STATIC_DIR = Path(__file__).resolve().parent.parent.parent.parent / "gui" / "static"
+
+
+class _NoCacheJsCss(BaseHTTPMiddleware):
+    """Set Cache-Control: no-cache for .js and .css static files.
+
+    Prevents browsers from serving stale GUI assets after a server update.
+    index.html is already served via FileResponse (no StaticFiles caching),
+    so only the script/stylesheet assets need this header.
+    """
+
+    async def dispatch(self, request: StarletteRequest, call_next):
+        response = await call_next(request)
+        path = request.url.path.split("?")[0]
+        if path.endswith((".js", ".css")):
+            response.headers["Cache-Control"] = "no-cache, must-revalidate"
+        return response
 
 
 def create_app(config_path: str | Path = "config/default.yaml") -> FastAPI:
@@ -58,6 +76,7 @@ def create_app(config_path: str | Path = "config/default.yaml") -> FastAPI:
         lifespan=lifespan,
     )
 
+    app.add_middleware(_NoCacheJsCss)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
