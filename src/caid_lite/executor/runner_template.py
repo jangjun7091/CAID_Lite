@@ -116,7 +116,7 @@ def _run() -> dict:
         bb = shape.BoundingBox()
         validation_metrics = {
             "is_valid": shape.isValid(),
-            "is_solid": isinstance(shape, cq.Solid),
+            "is_solid": isinstance(shape, (cq.Solid, cq.Compound)) and len(shape.Solids()) > 0,
             "volume": shape.Volume(),
             "face_count": len(shape.Faces()),
             "bbox": [bb.xlen, bb.ylen, bb.zlen],

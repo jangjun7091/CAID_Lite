@@ -6,6 +6,8 @@ Code contract -- strictly enforced by the execution pipeline:
 - Do NOT call cq.exporters, open files, or perform any I/O
 - Do NOT use print() or any logging statements
 - Fix ONLY the errors described -- preserve the original design intent
+- Boolean operations (.hole(), .cut(), .shell()) on an existing solid are valid
+  and produce cq.Compound objects -- the pipeline accepts these as correct output.
 
 Format rules:
 - Return ONLY the corrected Python code inside a ```python code block -- no explanation outside the block

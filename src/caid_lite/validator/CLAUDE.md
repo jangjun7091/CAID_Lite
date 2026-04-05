@@ -19,9 +19,14 @@ class GeometryValidator:
 
 ## Hard checks (failure → repair loop)
 - `solid.isValid()` via `BRepCheck_Analyzer`
-- `isinstance(model.val(), cq.occ_impl.shapes.Solid)`
+- `len(model.val().Solids()) > 0`  (accepts cq.Solid and cq.Compound wrapping solids;
+  rejects bare Wire/Face compounds from unclosed 2-D sketches)
 - `solid.Volume() > 1e-6`
 - `model.val() is not None`
+
+NOTE: Boolean operations like `.hole()` and `.cut()` return `cq.Compound`, not `cq.Solid`.
+The `is_solid` check uses `.Solids()` rather than `isinstance(..., cq.Solid)` so that any
+geometry containing at least one closed solid body passes, regardless of the OCC container type.
 
 ## Soft checks (warnings only)
 - All bounding box dimensions > 0

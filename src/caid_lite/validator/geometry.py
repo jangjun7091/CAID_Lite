@@ -49,7 +49,8 @@ class GeometryValidator:
 
     Hard checks:
         - ``is_valid``: shape passed BRep validity check
-        - ``is_solid``: result is a solid body (not a shell or wire)
+        - ``is_solid``: result contains at least one closed solid body (not a bare
+          shell, wire, or empty Compound)
         - ``volume > 0``: shape has non-trivial volume
 
     Soft checks (warnings, non-blocking):
@@ -96,8 +97,10 @@ class GeometryValidator:
         if not metrics.get("is_solid", False):
             errors.append(
                 "build_model() did not produce a solid body. "
-                "The result must be a cq.Solid — use operations like "
-                ".box(), .sphere(), or .extrude() that produce closed solids."
+                "The result contains no closed solid geometry. "
+                "Build a solid base first (.box(), .cylinder(), .extrude(), etc.) "
+                "before applying features. Boolean operations like .hole() and .cut() "
+                "are valid on an existing solid."
             )
 
         volume = float(metrics.get("volume") or 0.0)

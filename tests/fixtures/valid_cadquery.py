@@ -42,3 +42,27 @@ def build_model():
         .hole(hole_dia)
     )
 """
+
+SOURCE_CYLINDER_WITH_HOLE = """\
+import cadquery as cq
+
+
+def build_model():
+    \"\"\"Cylinder with a central through-hole.
+
+    This exercises the cq.Compound acceptance fix: .hole() produces a
+    Compound wrapping a Solid, not a bare cq.Solid.  The runner must
+    set is_solid=True via len(shape.Solids()) > 0.
+    \"\"\"
+    outer_dia = 30.0
+    inner_dia = 10.0
+    height = 20.0
+
+    return (
+        cq.Workplane("XY")
+        .cylinder(height, outer_dia / 2)
+        .faces(">Z")
+        .workplane()
+        .hole(inner_dia)
+    )
+"""

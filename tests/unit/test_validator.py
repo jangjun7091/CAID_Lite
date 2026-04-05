@@ -136,6 +136,60 @@ class TestGeometryValidatorSoftChecks:
         assert result.warnings == []
 
 
+# ── GeometryValidator — Compound solid (boolean ops) ─────────────────────────
+
+
+class TestGeometryValidatorCompoundSolid:
+    """Boolean operations (.hole(), .cut()) produce cq.Compound, not cq.Solid.
+
+    The fixed runner sets is_solid=True whenever len(shape.Solids()) > 0,
+    so these metrics must pass validation.
+    """
+
+    def test_compound_solid_metrics_passes(self, validator):
+        # Simulates metrics from .box().hole() or .cylinder().hole() --
+        # is_solid=True because shape.Solids() is non-empty even though
+        # .val() returns cq.Compound after boolean subtraction.
+        metrics = {
+            "is_valid": True,
+            "is_solid": True,
+            "volume": 9800.0,   # box minus hole volume
+            "face_count": 10,   # box faces + hole cylinder faces
+            "bbox": [60.0, 40.0, 6.0],
+        }
+        result = validator.validate(metrics)
+        assert result.valid is True
+        assert result.errors == []
+
+    def test_compound_zero_volume_still_fails(self, validator):
+        # is_solid=True but volume=0 must still be rejected.
+        metrics = {
+            "is_valid": True,
+            "is_solid": True,
+            "volume": 0.0,
+            "face_count": 10,
+            "bbox": [60.0, 40.0, 6.0],
+        }
+        result = validator.validate(metrics)
+        assert result.valid is False
+        assert any("volume" in e.lower() for e in result.errors)
+
+    def test_wire_compound_no_solid_fails(self, validator):
+        # A Compound of wires or faces (e.g. an unclosed sketch) has no
+        # cq.Solid children, so the fixed runner emits is_solid=False.
+        # The validator must still reject it.
+        metrics = {
+            "is_valid": True,
+            "is_solid": False,
+            "volume": 0.0,
+            "face_count": 1,
+            "bbox": [10.0, 10.0, 0.0],
+        }
+        result = validator.validate(metrics)
+        assert result.valid is False
+        assert any("solid" in e.lower() for e in result.errors)
+
+
 # ── GeometryValidator — missing / empty metrics ───────────────────────────────
 
 
