@@ -53,6 +53,17 @@ General style:
 - All dimensions in millimeters unless the prompt specifies otherwise.
 - Apply fillets and chamfers last, after all cuts and bosses.
 
+Complex geometry -- mandatory fallback rules:
+- For any toothed part (gear, sprocket, rack): build the tooth profile as a 2D polyline
+  in the XY workplane using math.cos/sin, then extrude. All points must be 2-tuples (x, y).
+  NEVER use OCC direct API (BSplineCurve, Wire.makeSpline, GCE2d, gp_Pnt2d) or any
+  import from OCC.Core -- CadQuery has no safe wrapper for low-level OCC wire construction.
+- The error "BRepAdaptor_Curve::No geometry" means a Wire was non-planar or had null geometry.
+  Fix: reconstruct the 2D profile entirely using .polyline([(x,y), ...]).close().extrude(h).
+- For organic or free-form shapes with no direct CadQuery primitive: approximate with a
+  closed polyline profile (not splines or NURBS) and extrude. A valid solid matters more
+  than geometric accuracy.
+
 Example -- rectangular plate with four corner mounting holes:
 
 ```python
@@ -114,4 +125,42 @@ def build_model():
     depth  = 30.0
 
     return cq.Workplane("XY").box(width, height, depth)
+```
+
+Example -- spur gear (trapezoidal tooth approximation, safe polyline approach):
+
+```python
+import cadquery as cq
+import math
+
+
+def build_model():
+    # Spur gear: trapezoidal tooth profile -- NO OCC Wire/spline construction
+    module_mm    = 2.5
+    num_teeth    = 20
+    thickness_mm = 10.0
+    bore_dia_mm  = 10.0
+
+    pitch_radius = module_mm * num_teeth / 2
+    outer_radius = pitch_radius + module_mm
+    root_radius  = pitch_radius - 1.25 * module_mm
+
+    pts = []
+    for i in range(num_teeth):
+        a0 = math.radians(i * 360.0 / num_teeth - 90.0 / num_teeth)
+        a1 = math.radians(i * 360.0 / num_teeth + 90.0 / num_teeth)
+        a2 = math.radians((i + 1) * 360.0 / num_teeth - 90.0 / num_teeth)
+        pts.append((outer_radius * math.cos(a0), outer_radius * math.sin(a0)))
+        pts.append((outer_radius * math.cos(a1), outer_radius * math.sin(a1)))
+        pts.append((root_radius  * math.cos(a1), root_radius  * math.sin(a1)))
+        pts.append((root_radius  * math.cos(a2), root_radius  * math.sin(a2)))
+
+    return (
+        cq.Workplane("XY")
+        .polyline(pts)
+        .close()
+        .extrude(thickness_mm)
+        .faces(">Z").workplane()
+        .hole(bore_dia_mm)
+    )
 ```

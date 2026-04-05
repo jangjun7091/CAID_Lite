@@ -29,6 +29,13 @@ Additional hole guidance:
   This produces Wire objects that fail when CadQuery expects a solid cutting tool.
 
 Common error -> fix mapping:
+- BRepAdaptor_Curve::No geometry (near Wire, makeSpline, extrude after spline, or OCC imports):
+    Low-level OCC wire/spline construction produced a non-planar or null wire.
+    Replace ENTIRELY with a 2D polyline approach:
+    (1) Compute (x, y) point list using math.cos / math.sin (all points in XY plane).
+    (2) cq.Workplane("XY").polyline(pts).close().extrude(thickness).
+    Remove ALL imports from OCC.Core. Remove cq.Wire.makeSpline() and any BSplineCurve usage.
+    Do NOT keep any part of the original wire construction.
 - "Wire" or "vector conversion" error near .eachpoint or .circle:
     Replace the entire hole block with .pushPoints([...]).hole(d) or .rarray(...).hole(d).
 - AttributeError on .circle() result inside eachpoint lambda:

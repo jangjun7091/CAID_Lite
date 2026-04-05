@@ -34,7 +34,11 @@
       "Bash(grep -v \"^$\")",
       "Bash(xargs grep:*)",
       "Bash(python -m pytest tests/unit/ -x -q)",
-      "Bash(python -m pytest tests/unit/ -q)"
+      "Bash(python -m pytest tests/unit/ -q)",
+      "Bash(python -c \"import caid_lite; print\\(''''import ok''''\\)\")",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ]
   }
 }

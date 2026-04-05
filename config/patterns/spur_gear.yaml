@@ -1,0 +1,97 @@
+name: spur_gear
+category: solid
+purpose: "Spur gear approximated with trapezoidal tooth profile using polyline and extrude."
+
+when_to_use: >-
+  Use when the user requests a gear, spur gear, helical gear, sprocket, or any toothed
+  rotational component. This pattern uses a 2D polyline in the XY workplane to approximate
+  gear teeth with trapezoidal profiles -- safe CadQuery approach that avoids OCC wire
+  construction errors entirely.
+
+idiom: |
+  import math
+
+  module_mm     = 2.0
+  num_teeth     = 20
+  thickness_mm  = 10.0
+  bore_dia_mm   = 8.0
+
+  pitch_radius = module_mm * num_teeth / 2
+  outer_radius = pitch_radius + module_mm
+  root_radius  = pitch_radius - 1.25 * module_mm
+
+  # Build trapezoidal tooth profile as 2D points in the XY plane
+  pts = []
+  for i in range(num_teeth):
+      a_tip_start = math.radians(i * 360.0 / num_teeth - 90.0 / num_teeth)
+      a_tip_end   = math.radians(i * 360.0 / num_teeth + 90.0 / num_teeth)
+      a_gap_end   = math.radians((i + 1) * 360.0 / num_teeth - 90.0 / num_teeth)
+      pts.append((outer_radius * math.cos(a_tip_start), outer_radius * math.sin(a_tip_start)))
+      pts.append((outer_radius * math.cos(a_tip_end),   outer_radius * math.sin(a_tip_end)))
+      pts.append((root_radius  * math.cos(a_tip_end),   root_radius  * math.sin(a_tip_end)))
+      pts.append((root_radius  * math.cos(a_gap_end),   root_radius  * math.sin(a_gap_end)))
+
+  gear = (
+      cq.Workplane("XY")
+      .polyline(pts)
+      .close()
+      .extrude(thickness_mm)
+      .faces(">Z").workplane()
+      .hole(bore_dia_mm)
+  )
+
+avoid:
+  - "NEVER build involute tooth profiles using Wire, BSplineCurve, makeSpline, or OCC direct API"
+  - "NEVER import from OCC.Core (GCE2d, gp_Pnt2d, BSplineCurve, etc.) -- always use CadQuery API"
+  - "NEVER use cq.Wire.makeSpline() for gear teeth -- causes BRepAdaptor_Curve::No geometry"
+  - "Do not use .eachpoint() with custom wire construction for tooth profiles"
+  - "Do not use .polarArray().rect().cutThruAll() on >Z face -- cuts axially, not radially"
+  - "Do not pass 3-tuples (x, y, z) to polyline -- use 2-tuples (x, y) only"
+
+parameters:
+  module_mm:    {type: float, unit: mm,    description: "Gear module (controls tooth size); pitch_dia = module * num_teeth"}
+  num_teeth:    {type: int,   unit: count, description: "Number of teeth (>= 8 recommended)"}
+  thickness_mm: {type: float, unit: mm,    description: "Gear face width (extrusion depth along Z)"}
+  bore_dia_mm:  {type: float, unit: mm,    description: "Central bore hole diameter; must be < 2 * root_radius"}
+
+example: |
+  import cadquery as cq
+  import math
+
+
+  def build_model():
+      """Spur gear: 20 teeth, module 2.5, 10 mm face width, 10 mm bore."""
+      module_mm     = 2.5
+      num_teeth     = 20
+      thickness_mm  = 10.0
+      bore_dia_mm   = 10.0
+
+      pitch_radius = module_mm * num_teeth / 2   # 25.0 mm
+      outer_radius = pitch_radius + module_mm    # 27.5 mm
+      root_radius  = pitch_radius - 1.25 * module_mm  # 21.875 mm
+
+      pts = []
+      for i in range(num_teeth):
+          a_tip_start = math.radians(i * 360.0 / num_teeth - 90.0 / num_teeth)
+          a_tip_end   = math.radians(i * 360.0 / num_teeth + 90.0 / num_teeth)
+          a_gap_end   = math.radians((i + 1) * 360.0 / num_teeth - 90.0 / num_teeth)
+          pts.append((outer_radius * math.cos(a_tip_start), outer_radius * math.sin(a_tip_start)))
+          pts.append((outer_radius * math.cos(a_tip_end),   outer_radius * math.sin(a_tip_end)))
+          pts.append((root_radius  * math.cos(a_tip_end),   root_radius  * math.sin(a_tip_end)))
+          pts.append((root_radius  * math.cos(a_gap_end),   root_radius  * math.sin(a_gap_end)))
+
+      return (
+          cq.Workplane("XY")
+          .polyline(pts)
+          .close()
+          .extrude(thickness_mm)
+          .faces(">Z").workplane()
+          .hole(bore_dia_mm)
+      )
+
+repair_hints:
+  - "BRepAdaptor_Curve::No geometry -- rebuild profile using polyline with all XY-plane 2-tuples."
+  - "If extrude fails, verify all pts are 2-tuples (x, y) with no z component."
+  - "If bore fails: ensure bore_dia_mm < 2 * root_radius (bore must be smaller than root circle)."
+  - "If teeth look wrong: check num_teeth >= 8 and module_mm >= 1.0."
+  - "If the profile self-intersects (too few teeth with large module): increase num_teeth or reduce module."
