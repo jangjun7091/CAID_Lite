@@ -1,0 +1,53 @@
+name: gusset
+category: assembly
+purpose: "Triangular stiffening rib that reinforces a right-angle joint (e.g. inside an L-bracket corner)."
+
+when_to_use: >-
+  A flat right-triangle plate used to increase rigidity at 90-degree joints.
+  Common in bracket assemblies, sheet-metal corner braces, and structural frames.
+  The hypotenuse face is typically left free; the two legs sit against the mating surfaces.
+
+idiom: |
+  # Right-triangle profile in XZ plane, extruded along +Y (thickness direction)
+  (cq.Workplane("XZ")
+      .moveTo(0, 0)
+      .lineTo(base, 0)
+      .lineTo(0, height)
+      .close()
+      .extrude(thickness))
+
+avoid:
+  - "Using splines or arcs on the hypotenuse -- straight line only; gussets are flat"
+  - "thickness > min(base, height) / 2 -- oversized gusset overwhelms the joint"
+  - ".shell() or .fillet() on the triangle profile before extrusion -- apply chamfer/fillet after extrusion if needed"
+  - "Forgetting .close() -- open triangular wire cannot be extruded"
+
+parameters:
+  base:      {type: float, unit: mm, description: "Length of the horizontal leg (x-direction)"}
+  height:    {type: float, unit: mm, description: "Length of the vertical leg (z-direction)"}
+  thickness: {type: float, unit: mm, description: "Extrusion thickness (y-direction)"}
+
+example: |
+  import cadquery as cq
+
+
+  def build_model():
+      # Triangular gusset / corner stiffener
+      base      = 30.0   # horizontal leg length (mm)
+      height    = 30.0   # vertical leg length (mm)
+      thickness =  5.0   # plate thickness (mm)
+
+      return (
+          cq.Workplane("XZ")
+          .moveTo(0, 0)
+          .lineTo(base,   0)
+          .lineTo(0,      height)
+          .close()
+          .extrude(thickness)
+      )
+
+repair_hints:
+  - "Open wire / cannot extrude: use .moveTo() + .lineTo() + .close() -- do NOT use .polyline() with only 3 points without .close()."
+  - "Wrong orientation: if the gusset should sit flat on an XY surface, change the profile plane to 'XY' and extrude along Z."
+  - "To fillet the right-angle corner of the gusset: add .edges('|Y').fillet(r) after extrusion (selects Y-parallel edges at the corner)."
+  - "To position gusset inside an L-bracket corner: .translate((0, offset_along_Y, 0)) after building."

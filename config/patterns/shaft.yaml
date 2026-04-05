@@ -1,0 +1,86 @@
+name: shaft
+category: assembly
+purpose: "Stepped rotating shaft with a large-diameter shoulder and a smaller-diameter journal, optionally with a keyway slot."
+
+when_to_use: >-
+  A concentric stepped cylinder used as a mechanical axis of rotation. The shoulder
+  (larger diameter) acts as an axial locating surface or bearing seat reference;
+  the journal (smaller diameter) fits into bearings or support holes. A keyway
+  slot on the journal transmits torque to a hub or gear. Use when the prompt
+  mentions shaft, axle, spindle, or rotating component with a step.
+
+idiom: |
+  # Step 1: shoulder (large diameter, short)
+  shaft = cq.Workplane("XY").cylinder(shoulder_len, shoulder_r)
+
+  # Step 2: journal (small diameter, long) extruded from shoulder top face
+  shaft = (
+      shaft
+      .faces(">Z").workplane()
+      .circle(shaft_r).extrude(shaft_len)
+  )
+
+  # Step 3: keyway slot cut from top of journal (optional)
+  shaft = (
+      shaft
+      .faces(">Z").workplane()
+      .center(0, -shaft_len / 4)          # offset toward middle of journal
+      .rect(key_w, key_len).cutBlind(-key_depth)
+  )
+
+avoid:
+  - ".revolve() with a stepped profile -- sequential .cylinder() + .extrude() is simpler and avoids revolve axis alignment issues"
+  - "shaft_r >= shoulder_r -- journal must be strictly smaller than shoulder"
+  - "key_depth > shaft_r -- keyway deeper than shaft radius removes too much material"
+  - ".cutThruAll() for keyway -- use .cutBlind(-key_depth) to control depth precisely"
+  - "Centering the keyway rect at (0,0) on '>Z' face -- that places it at the very tip; offset toward the middle of the journal"
+
+parameters:
+  shoulder_r:   {type: float, unit: mm, description: "Shoulder outer radius (large end)"}
+  shoulder_len: {type: float, unit: mm, description: "Axial length of the shoulder"}
+  shaft_r:      {type: float, unit: mm, description: "Journal radius (must be < shoulder_r)"}
+  shaft_len:    {type: float, unit: mm, description: "Axial length of the journal"}
+  key_w:        {type: float, unit: mm, description: "Keyway slot width"}
+  key_len:      {type: float, unit: mm, description: "Keyway slot length (along shaft axis)"}
+  key_depth:    {type: float, unit: mm, description: "Keyway slot depth (radial)"}
+
+example: |
+  import cadquery as cq
+
+
+  def build_model():
+      # Stepped shaft: shoulder + journal + keyway
+      shoulder_r   = 15.0   # shoulder radius (mm)
+      shoulder_len = 10.0   # shoulder axial length (mm)
+      shaft_r      = 10.0   # journal radius (mm)
+      shaft_len    = 60.0   # journal axial length (mm)
+      key_w        =  4.0   # keyway width (mm)
+      key_len      = 30.0   # keyway length (mm)
+      key_depth    =  2.0   # keyway depth (mm)
+
+      # Step 1: shoulder
+      shaft = cq.Workplane("XY").cylinder(shoulder_len, shoulder_r)
+
+      # Step 2: journal extruded from shoulder top
+      shaft = (
+          shaft
+          .faces(">Z").workplane()
+          .circle(shaft_r).extrude(shaft_len)
+      )
+
+      # Step 3: keyway slot on journal surface, centred axially
+      shaft = (
+          shaft
+          .faces(">Z").workplane()
+          .center(0, -(shaft_len / 2 - key_len / 2))
+          .rect(key_w, key_len).cutBlind(-key_depth)
+      )
+
+      return shaft
+
+repair_hints:
+  - "Geometry error after extrude on >Z: ensure shaft_r < shoulder_r so the journal circle fits inside the shoulder face."
+  - "Keyway cut fails: key_w must be <= 2 * shaft_r and key_depth must be < shaft_r."
+  - "Wrong keyway position: .center(dx, dy) offsets within the workplane before .rect(). Use center(0, -(shaft_len/2 - key_len/2)) to place the keyway at mid-journal."
+  - "To add a central through-bore (hollow shaft): after building, .faces('<Z').workplane().hole(bore_d)."
+  - "To add a retaining ring groove: .faces('>Z').workplane().circle(shaft_r).circle(shaft_r - groove_d).extrude(-groove_w) before keyway."

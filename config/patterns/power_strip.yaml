@@ -38,7 +38,7 @@ parameters:
   thickness_mm:     {type: float, unit: mm, description: "Height / thickness of the housing (Z axis)"}
   num_sockets:      {type: int,   unit: count, description: "Number of socket holes in the row"}
   socket_dia_mm:    {type: float, unit: mm, description: "Diameter of each socket hole; must be < width_mm"}
-  socket_spacing_mm:{type: float, unit: mm, description: "Centre-to-centre spacing between sockets"}
+  socket_spacing_mm: {type: float, unit: mm, description: "Centre-to-centre spacing between sockets"}
   cord_dia_mm:      {type: float, unit: mm, description: "Diameter of the power cord exit hole on the end face"}
 
 example: |

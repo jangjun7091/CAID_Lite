@@ -61,6 +61,16 @@ Complexity budget -- hard limits per build_model():
 - If the design plan specifies an "Operation sequence", implement those steps in order
   and do not add extra operations beyond what is listed.
 
+L-bracket face selectors (XZ-plane polyline, extruded along +Y):
+- Horizontal leg holes: use .faces("<Z").workplane() — this is the bottom face at z=0.
+  pushPoints coords are relative to face centroid: u = X-world, v = Y-world.
+  formula: hx = leg_w/2 - margin,  hy = length/2 - margin
+- Vertical leg holes (wall attachment face): use .faces("<X").workplane() — outer face at x=0.
+  pushPoints coords: u = Y-world, v = Z-world.
+  formula: vx = length/2 - margin,  vz = leg_h/2 - margin
+- NEVER use .faces(">Z") for horizontal-leg holes — ">Z" selects the TOP of the vertical leg
+  (z=leg_h), NOT the top surface of the horizontal leg.
+
 Complex geometry -- mandatory fallback rules:
 - For any toothed part (gear, sprocket, rack): build the tooth profile as a 2D polyline
   in the XY workplane using math.cos/sin, then extrude. All points must be 2-tuples (x, y).

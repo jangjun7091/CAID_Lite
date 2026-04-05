@@ -22,6 +22,17 @@ Rules:
     module_mm=2.5, num_teeth=20, thickness_mm=10, bore_dia_mm=10.
   Pitch diameter = module * num_teeth (e.g. module=2.5, 20 teeth -> pitch_dia=50 mm).
   If the user gives only outer diameter D, derive: num_teeth = round(D / module) - 2.
+- Common mechanical bracket and component types -- use these geometry_type values and defaults:
+    u_bracket / channel / c-channel / U자 브라켓:
+        geometry_type="u_bracket",
+        constraints: width_mm=60, leg_h_mm=40, wall_t_mm=5, length_mm=80
+    gusset / stiffener / corner rib / 거싯:
+        geometry_type="gusset",
+        constraints: base_mm=30, height_mm=30, thickness_mm=5
+    shaft / axle / spindle / 샤프트 / 축 (with shoulder + keyway):
+        geometry_type="shaft",
+        constraints: shoulder_r_mm=15, shoulder_len_mm=10,
+                     shaft_r_mm=10, shaft_len_mm=60, key_w_mm=4, key_depth_mm=2
 - Common everyday objects -- use these geometry_type values and defaults when not stated:
     phone / smartphone / iphone / 폰 / 아이폰 / 스마트폰:
         geometry_type="rounded_box",

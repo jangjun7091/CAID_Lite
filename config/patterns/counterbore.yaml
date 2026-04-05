@@ -1,0 +1,76 @@
+name: counterbore
+category: feature
+purpose: "Stepped hole with a wide shallow recess for the bolt head and a narrow through-bore for the shank (socket-head cap screw seat)."
+
+when_to_use: >-
+  When a socket-head cap screw (hex-key bolt) must sit flush or below the part surface.
+  The wide upper recess accommodates the cylindrical head; the narrow lower bore passes
+  the shank through. Use .cboreHole() -- CadQuery's built-in compound bore -- instead
+  of manual cutBlind + hole combinations to avoid geometry conflicts.
+
+idiom: |
+  (solid
+      .faces(face_selector).workplane()
+      .pushPoints(positions)
+      .cboreHole(diameter=bolt_clear_d,
+                 cboreDiameter=head_d,
+                 cboreDepth=head_depth))
+
+  # For a single centred counterbore (no pushPoints needed):
+  (solid
+      .faces(face_selector).workplane()
+      .cboreHole(diameter=bolt_clear_d,
+                 cboreDiameter=head_d,
+                 cboreDepth=head_depth))
+
+avoid:
+  - "Calling .hole() twice to simulate a counterbore -- the second .hole() may not subtract correctly from the first recess"
+  - "head_d <= bolt_clear_d -- head diameter must be strictly greater than bore diameter"
+  - "head_depth >= part_thickness -- recess deeper than the part removes all material"
+  - "Using .cutBlind() + .hole() manually when .cboreHole() is available -- the built-in is more reliable"
+
+parameters:
+  bolt_clear_d: {type: float, unit: mm, description: "Clearance bore diameter (bolt shank, not thread OD)"}
+  head_d:       {type: float, unit: mm, description: "Counterbore diameter (bolt head outer diameter + small clearance)"}
+  head_depth:   {type: float, unit: mm, description: "Counterbore depth (at least as deep as the bolt head height)"}
+
+iso_defaults:
+  M3: {bolt_clear_d: 3.4, head_d: 5.5,  head_depth: 3.0}
+  M4: {bolt_clear_d: 4.5, head_d: 7.0,  head_depth: 4.0}
+  M5: {bolt_clear_d: 5.5, head_d: 8.5,  head_depth: 5.0}
+  M6: {bolt_clear_d: 6.6, head_d: 10.0, head_depth: 6.0}
+  M8: {bolt_clear_d: 9.0, head_d: 13.0, head_depth: 8.0}
+
+example: |
+  import cadquery as cq
+
+
+  def build_model():
+      # 80 x 50 x 20 mm plate with four M4 counterbored mounting holes
+      width       = 80.0
+      height      = 50.0
+      thickness   = 20.0
+      bolt_clear  =  4.5   # M4 clearance bore
+      cbore_dia   =  7.0   # M4 socket-head counterbore diameter
+      cbore_depth =  4.0   # M4 head height
+      margin      = 12.0   # hole inset from each edge
+
+      cx = width  / 2 - margin
+      cy = height / 2 - margin
+
+      return (
+          cq.Workplane("XY")
+          .box(width, height, thickness)
+          .faces(">Z").workplane()
+          .pushPoints([( cx,  cy), (-cx,  cy),
+                       ( cx, -cy), (-cx, -cy)])
+          .cboreHole(diameter=bolt_clear,
+                     cboreDiameter=cbore_dia,
+                     cboreDepth=cbore_depth)
+      )
+
+repair_hints:
+  - "TypeError / unexpected keyword: CadQuery's method signature is cboreHole(diameter, cboreDiameter, cboreDepth, depth=None). 'depth=None' makes it a through-hole."
+  - "Counterbore too shallow: head_depth must be >= actual bolt head height (M4 head = 4 mm, add 0.5 mm clearance)."
+  - "Head diameter too small: head_d must be > bolt OD. For M4 socket head (head OD=7 mm), use cboreDiameter=7.5 for a slip fit."
+  - "To add a countersink instead of a counterbore, use .cskHole(diameter=bolt_clear_d, cskDiameter=csk_d, cskAngle=82) for flat-head screws."

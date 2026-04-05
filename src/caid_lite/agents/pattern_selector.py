@@ -53,8 +53,24 @@ _KEYWORD_MAP: Dict[str, List[str]] = {
     "tooth":       ["spur_gear"],
     "teeth":       ["spur_gear"],
     "involute":    ["spur_gear"],
-    "shaft":       ["shaft_support", "cylinder"],
-    "axle":        ["shaft_support", "cylinder"],
+    # Mechanical rotating/stepped parts
+    "shaft":       ["shaft", "shaft_support", "cylinder"],
+    "axle":        ["shaft", "shaft_support", "cylinder"],
+    "spindle":     ["shaft"],
+    "keyway":      ["shaft"],
+    "shoulder":    ["shaft"],
+    # U/C channel brackets
+    "u_bracket":   ["u_bracket"],
+    "u-bracket":   ["u_bracket"],
+    "channel":     ["u_bracket"],
+    "c-channel":   ["u_bracket"],
+    # Gusset / stiffener
+    "gusset":      ["gusset", "l_bracket"],
+    "stiffener":   ["gusset"],
+    "reinforcement": ["gusset"],
+    # Counterbore / countersink
+    "counterbore": ["counterbore"],
+    "cbore":       ["counterbore"],
     "tube":        ["tube"],
     "pipe":        ["tube"],
     "hole":        ["through_hole"],

@@ -21,24 +21,40 @@ avoid:
   - "Building two separate .box() solids and trying to union them -- profile extrusion is simpler and more robust"
   - "Forgetting .close() after .polyline() -- leaves an open wire that cannot be extruded"
   - "Using the XY plane for an L profile that needs a Z component -- XZ or YZ is correct"
+  - "Using .faces('>Z') for horizontal-leg holes -- '>Z' selects the TOP of the vertical leg (z=leg_h), NOT the horizontal leg surface"
+  - "Using .faces('>Y') or .faces('<Y') for mounting holes -- those are the flat side faces, not the leg surfaces"
 
 parameters:
   leg_w:  {type: float, unit: mm, description: "Width of the horizontal leg"}
   leg_h:  {type: float, unit: mm, description: "Height of the vertical leg"}
   wall_t: {type: float, unit: mm, description: "Material thickness (both legs)"}
   length: {type: float, unit: mm, description: "Extrusion length (bracket depth)"}
+  bolt_d: {type: float, unit: mm, description: "Mounting bolt clearance hole diameter"}
+  margin: {type: float, unit: mm, description: "Hole inset from each edge"}
+
+face_selector_guide: |
+  L-bracket built with XZ polyline extruded along +Y:
+    <Z  → bottom face of horizontal leg (z=0)   ← USE THIS for horizontal-leg holes
+    <X  → outer face of vertical leg (x=0)      ← USE THIS for vertical-leg holes
+    >Z  → TOP of vertical leg (z=leg_h)         ← NOT the horizontal leg surface!
+    >X  → right end face of horizontal leg (x=leg_w)
+    >Y  / <Y → flat extrusion end faces
 
 example: |
   import cadquery as cq
 
 
   def build_model():
-      leg_w  = 50.0
-      leg_h  = 40.0
-      wall_t =  5.0
-      length = 60.0
+      # L-bracket with mounting holes on both legs
+      leg_w  = 50.0   # horizontal leg width (mm)
+      leg_h  = 40.0   # vertical leg height (mm)
+      wall_t =  5.0   # material thickness (mm)
+      length = 60.0   # extrusion depth (mm)
+      bolt_d =  4.5   # M4 clearance hole diameter (mm)
+      margin = 12.0   # hole inset from each edge (mm)
 
-      return (
+      # Step 1: L-profile in XZ plane, extruded along +Y
+      bracket = (
           cq.Workplane("XZ")
           .polyline([
               (0,      0),
@@ -52,7 +68,35 @@ example: |
           .extrude(length)
       )
 
+      # Step 2: Holes on horizontal leg
+      # Use <Z (bottom face at z=0); origin at face centroid (leg_w/2, length/2)
+      hx = leg_w / 2 - margin
+      hy = length / 2 - margin
+      bracket = (
+          bracket
+          .faces("<Z").workplane()
+          .pushPoints([( hx,  hy), (-hx,  hy),
+                       ( hx, -hy), (-hx, -hy)])
+          .hole(bolt_d)
+      )
+
+      # Step 3: Holes on vertical leg (wall attachment face)
+      # Use <X (outer face at x=0); u=Y-world, v=Z-world, origin at centroid
+      vx = length / 2 - margin
+      vz = leg_h / 2 - margin
+      bracket = (
+          bracket
+          .faces("<X").workplane()
+          .pushPoints([( vx,  vz), (-vx,  vz),
+                       ( vx, -vz), (-vx, -vz)])
+          .hole(bolt_d)
+      )
+
+      return bracket
+
 repair_hints:
   - "Cannot extrude open wire: ensure .close() immediately follows .polyline()."
   - "Extrusion in wrong direction: swap the plane argument ('XZ' vs 'YZ') or use .extrude(-length)."
-  - "To add mounting holes: chain .faces('>Y').workplane().pushPoints([...]).hole(d) after extrusion."
+  - "Holes on wrong surface: for horizontal-leg holes use .faces('<Z'), for vertical-leg holes use .faces('<X')."
+  - "pushPoints out of range: coordinates are relative to face centroid. hx = leg_w/2 - margin, hy = length/2 - margin."
+  - "Wrong face selected for vertical leg: '<X' is the outer face (x=0). If the bracket is oriented differently, check the bounding box with .val().BoundingBox()."

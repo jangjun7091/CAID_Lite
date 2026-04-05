@@ -1,0 +1,77 @@
+name: u_bracket
+category: assembly
+purpose: "U-channel / C-channel bracket with two parallel vertical legs and a flat base."
+
+when_to_use: >-
+  A structural channel bracket where two vertical legs rise from a common base plate.
+  Used for guide rails, cable channels, slide mounts, structural clamps, and
+  framing profiles. All three walls share the same material thickness.
+
+idiom: |
+  # U-profile in XZ plane, extruded along +Y
+  (cq.Workplane("XZ")
+      .polyline([
+          (0,            0),
+          (width,        0),
+          (width,        wall_t),
+          (width - wall_t, wall_t),
+          (width - wall_t, leg_h),
+          (wall_t,       leg_h),
+          (wall_t,       wall_t),
+          (0,            wall_t),
+      ])
+      .close()
+      .extrude(length))
+
+avoid:
+  - "Building two separate L-shapes or three separate boxes and union-ing -- profile extrusion is simpler and avoids coincident-face topology issues"
+  - "Forgetting .close() after .polyline() -- open wire cannot be extruded"
+  - "Using XY plane instead of XZ -- the U-profile needs the Z axis for leg height"
+  - "Misordering polyline points so the profile is self-intersecting -- trace the outer boundary clockwise or counter-clockwise consistently"
+
+parameters:
+  width:  {type: float, unit: mm, description: "Overall channel width (outer, x-direction)"}
+  leg_h:  {type: float, unit: mm, description: "Leg height from base top to lip (z-direction)"}
+  wall_t: {type: float, unit: mm, description: "Wall thickness (base and both legs equal)"}
+  length: {type: float, unit: mm, description: "Extrusion depth (y-direction)"}
+
+face_selector_guide: |
+  U-bracket built with XZ polyline extruded along +Y:
+    <Z  → outer bottom face of base (z=0)         ← mounting holes through base
+    >Z  → top lips of both legs (z=leg_h)         ← lip holes if needed
+    <X  → outer face of left leg (x=0)            ← side attachment
+    >X  → outer face of right leg (x=width)       ← side attachment
+    >Y / <Y → flat extrusion end faces
+
+example: |
+  import cadquery as cq
+
+
+  def build_model():
+      # U-channel bracket
+      width  = 60.0   # overall outer width (mm)
+      leg_h  = 40.0   # leg height (mm)
+      wall_t =  5.0   # wall thickness (mm)
+      length = 80.0   # channel length / extrusion depth (mm)
+
+      return (
+          cq.Workplane("XZ")
+          .polyline([
+              (0,              0),
+              (width,          0),
+              (width,          wall_t),
+              (width - wall_t, wall_t),
+              (width - wall_t, leg_h),
+              (wall_t,         leg_h),
+              (wall_t,         wall_t),
+              (0,              wall_t),
+          ])
+          .close()
+          .extrude(length)
+      )
+
+repair_hints:
+  - "Self-intersecting profile error: check that polyline points trace the outer U boundary without crossing. Right leg outer edge must be at x=width, inner edge at x=width-wall_t."
+  - "Cannot extrude open wire: .close() must immediately follow .polyline()."
+  - "Legs too thin or wall_t >= width/2: ensure width > 2 * wall_t so the inner channel has positive width."
+  - "To add mounting holes through the base: .faces('<Z').workplane().rarray(spacing, 1, n, 1).hole(d)"
