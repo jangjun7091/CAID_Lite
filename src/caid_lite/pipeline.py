@@ -29,6 +29,7 @@ from .executor.sandbox import Sandbox
 from .llm.base import LLMBackend, LLMConfig
 from .llm.factory import LLMFactory
 from .llm.prompts import PromptBuilder
+from .logging.dataset import DatasetWriter
 from .logging.logger import get_logger
 from .repair.loop import RepairLoop, RepairResult
 from .validator.geometry import GeometryValidator, ValidationResult
@@ -179,6 +180,7 @@ class CADPipeline:
         pattern_selector: Optional[PatternSelector] = None,
         designer: Optional[DesignerAgent] = None,
         critic: Optional[CriticAgent] = None,
+        dataset_writer: Optional[DatasetWriter] = None,
     ) -> None:
         self._llm = llm
         self._sandbox = sandbox if sandbox is not None else Sandbox()
@@ -189,6 +191,7 @@ class CADPipeline:
         self._pattern_selector = pattern_selector
         self._designer = designer
         self._critic = critic
+        self._dataset_writer = dataset_writer
 
     # ------------------------------------------------------------------
     # Factory
@@ -276,6 +279,11 @@ class CADPipeline:
         else:
             _log.info("Mode         : single-LLM (agents.enabled=false)")
 
+        log_dir = Path(
+            data.get("logging", {}).get("log_dir", "data/logs")
+        )
+        dataset_writer = DatasetWriter(log_dir=log_dir)
+
         return cls(
             llm=llm,
             sandbox=sandbox,
@@ -285,6 +293,7 @@ class CADPipeline:
             pattern_selector=pattern_selector,
             designer=designer,
             critic=critic,
+            dataset_writer=dataset_writer,
         )
 
     # ------------------------------------------------------------------
@@ -468,7 +477,7 @@ class CADPipeline:
                 f"[{run_id[:8]}] Pipeline failed in {elapsed:.2f}s"
             )
 
-        return PipelineResult(
+        pipeline_result = PipelineResult(
             run_id=run_id,
             success=final_success,
             prompt=prompt,
@@ -482,6 +491,22 @@ class CADPipeline:
             critic=critic_dict,
             error=final_error,
         )
+
+        # ── Step 7: Dataset logging ───────────────────────────────────
+        if self._dataset_writer is not None:
+            try:
+                record = pipeline_result.to_dict()
+                self._dataset_writer.write(record)
+
+                # Golden sample: first-attempt success (no repair loop invoked)
+                repair_iters = (repair_result.iterations if repair_result else 0)
+                if final_success and repair_iters == 0:
+                    self._dataset_writer.write_golden(record)
+                    _log.debug(f"[{run_id[:8]}] Golden sample recorded")
+            except Exception as exc:
+                _log.warning(f"[{run_id[:8]}] DatasetWriter failed: {exc}")
+
+        return pipeline_result
 
     # ------------------------------------------------------------------
     # Code extraction

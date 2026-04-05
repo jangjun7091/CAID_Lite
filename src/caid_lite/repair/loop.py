@@ -20,6 +20,101 @@ from ..validator.geometry import GeometryValidator, ValidationResult
 
 _log = get_logger(__name__)
 
+# ── Error type constants ──────────────────────────────────────────────────────
+
+ERROR_GEOMETRY_CONSTRUCTION = "GEOMETRY_CONSTRUCTION"
+ERROR_MISSING_BUILD_MODEL   = "MISSING_BUILD_MODEL"
+ERROR_WRONG_RETURN_TYPE     = "WRONG_RETURN_TYPE"
+ERROR_SYNTAX                = "SYNTAX_ERROR"
+ERROR_IMPORT                = "IMPORT_ERROR"
+ERROR_VALIDATION_FAILURE    = "VALIDATION_FAILURE"
+ERROR_UNIT                  = "UNIT_ERROR"
+ERROR_UNKNOWN               = "UNKNOWN"
+
+
+def classify_error(error: str) -> str:
+    """Classify a repair error string into a coarse error type.
+
+    The returned type string is used by ``RepairLoop`` to inject targeted
+    repair guidance into the LLM prompt via ``PromptBuilder``.
+
+    Args:
+        error: Python traceback, CadQuery error message, or validation
+               failure string produced by ``ValidationResult.format_errors()``.
+
+    Returns:
+        One of the ``ERROR_*`` module-level constants.
+    """
+    if not error:
+        return ERROR_UNKNOWN
+
+    lower = error.lower()
+
+    # OCC / Wire / BRep geometry construction errors
+    if any(kw in lower for kw in (
+        "brepadaptor", "no geometry", "makespline", "bspline",
+        "breplib_findsurface", "nullobject", "standard_nullobject",
+        "brepcheck", "topods",
+    )):
+        return ERROR_GEOMETRY_CONSTRUCTION
+    # Wire-only check — requires accompanying OCC context; raw "wire" is too broad
+    if "wire" in lower and any(kw in lower for kw in ("occ", "solid", "shape", "topology")):
+        return ERROR_GEOMETRY_CONSTRUCTION
+
+    # Return type wrong — check BEFORE build_model so "must return" wins
+    if "must return a cq.workplane" in lower or (
+        "must return" in lower and "workplane" in lower
+    ):
+        return ERROR_WRONG_RETURN_TYPE
+    # Also catch the runner's type-check message
+    if "build_model() must return" in lower:
+        return ERROR_WRONG_RETURN_TYPE
+
+    # Validation failure messages that mention build_model — check BEFORE
+    # MISSING_BUILD_MODEL so "did not produce" wins
+    if "did not produce" in lower or "solid body" in lower:
+        return ERROR_VALIDATION_FAILURE
+
+    # build_model() missing or not callable
+    if any(kw in lower for kw in (
+        "not callable", "nameerror",
+    )):
+        return ERROR_MISSING_BUILD_MODEL
+    if "build_model" in lower and ("not defined" in lower or "not found" in lower):
+        return ERROR_MISSING_BUILD_MODEL
+
+    # Return type wrong (broader fallback)
+    if any(kw in lower for kw in ("typeerror",)) and "workplane" in lower:
+        return ERROR_WRONG_RETURN_TYPE
+
+    # Python syntax / indentation
+    if any(kw in lower for kw in (
+        "syntaxerror", "indentationerror", "unexpected indent",
+        "invalid syntax", "eol while scanning",
+    )):
+        return ERROR_SYNTAX
+
+    # Missing imports
+    if any(kw in lower for kw in (
+        "importerror", "modulenotfounderror", "no module named",
+    )):
+        return ERROR_IMPORT
+
+    # Validation failures from GeometryValidator (unit / dimension error)
+    if any(kw in lower for kw in (
+        "extreme dimension", "wrong unit", "millimeter",
+    )):
+        return ERROR_UNIT
+
+    # Validation failures (volume, solid, valid)
+    if any(kw in lower for kw in (
+        "volume", "solid body", "isvalid", "bounding box",
+        "face_count", "validation",
+    )):
+        return ERROR_VALIDATION_FAILURE
+
+    return ERROR_UNKNOWN
+
 
 def _extract_code(response: str) -> str:
     """Strip markdown fences from an LLM response (first block wins)."""
@@ -146,12 +241,16 @@ class RepairLoop:
 
         for i in range(self._max_iterations):
             prefix_short = run_id_prefix[:8] if run_id_prefix else "repair"
+
+            error_type = classify_error(current_error)
             _log.info(
-                f"[{prefix_short}] Repair attempt {i + 1}/{self._max_iterations}"
+                f"[{prefix_short}] Repair attempt {i + 1}/{self._max_iterations} "
+                f"[error_type={error_type}]"
             )
 
             system, user = self._prompt_builder.build_repair_prompt(
-                original_prompt, current_code, current_error, iteration=i
+                original_prompt, current_code, current_error,
+                iteration=i, error_type=error_type,
             )
             raw = self._llm.generate(user, system)
             new_code = _extract_code(raw)

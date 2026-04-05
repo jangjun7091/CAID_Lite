@@ -96,18 +96,73 @@ class PromptBuilder:
         system = self._load("system_generate.txt", _DEFAULT_SYSTEM_GENERATE)
         return system, user_description
 
+    # ── Error-type specific hint blocks ──────────────────────────────────────
+    _ERROR_HINTS: dict[str, str] = {
+        "GEOMETRY_CONSTRUCTION": (
+            "TARGETED FIX (GEOMETRY_CONSTRUCTION): "
+            "The error is caused by invalid OCC Wire/BSpline construction. "
+            "Replace the failing geometry entirely using safe CadQuery primitives:\n"
+            "  - For tooth/gear profiles: use .polyline([(x,y),...]).close().extrude(h)\n"
+            "  - Do NOT import from OCC.Core or use cq.Wire.makeSpline()\n"
+            "  - All polyline points must be 2-tuples (x, y) in the XY plane"
+        ),
+        "MISSING_BUILD_MODEL": (
+            "TARGETED FIX (MISSING_BUILD_MODEL): "
+            "The file must define exactly: def build_model():\n"
+            "  - No arguments, no default parameters\n"
+            "  - Must return a cq.Workplane object\n"
+            "  - Do NOT assign geometry to a top-level variable"
+        ),
+        "WRONG_RETURN_TYPE": (
+            "TARGETED FIX (WRONG_RETURN_TYPE): "
+            "build_model() must return the cq.Workplane object directly.\n"
+            "  - Do NOT return None, a solid, or a tuple\n"
+            "  - The final chain must end with a cq.Workplane method\n"
+            "  - Example: return cq.Workplane('XY').box(w, h, t)"
+        ),
+        "SYNTAX_ERROR": (
+            "TARGETED FIX (SYNTAX_ERROR): "
+            "The code has a Python syntax error. Check:\n"
+            "  - Matching parentheses and brackets\n"
+            "  - Consistent 4-space indentation (no tabs)\n"
+            "  - No trailing commas inside function calls unless in a list/tuple"
+        ),
+        "IMPORT_ERROR": (
+            "TARGETED FIX (IMPORT_ERROR): "
+            "A required module is missing. Ensure:\n"
+            "  - First line: import cadquery as cq\n"
+            "  - import math  (if trigonometry is needed)\n"
+            "  - Do NOT import from OCC.Core, OCC.Display, or any non-stdlib module"
+        ),
+        "UNIT_ERROR": (
+            "TARGETED FIX (UNIT_ERROR): "
+            "Dimensions appear to use wrong units (cm or m instead of mm).\n"
+            "  - All dimensions must be in millimeters\n"
+            "  - Typical ranges: thickness 2-50 mm, width/height 10-500 mm\n"
+            "  - Convert: 1 cm = 10 mm, 1 m = 1000 mm"
+        ),
+        "VALIDATION_FAILURE": (
+            "TARGETED FIX (VALIDATION_FAILURE): "
+            "Geometry was produced but failed quality checks. Verify:\n"
+            "  - build_model() returns a closed solid (not a 2D sketch or wire)\n"
+            "  - Volume must be > 0: ensure the model is fully extruded\n"
+            "  - Boolean ops (.hole(), .cut()) on an existing solid are valid and produce cq.Compound"
+        ),
+    }
+
     def build_repair_prompt(
         self,
         original_description: str,
         failed_code: str,
         error_message: str,
         iteration: int = 0,
+        error_type: str = "UNKNOWN",
     ) -> tuple[str, str]:
         """Return ``(system_prompt, user_prompt)`` for a repair attempt.
 
-        The user prompt embeds the original NL intent, the failed code, and
-        the exact error so the LLM has full context to fix the problem without
-        drifting from the design intent.
+        The user prompt embeds the original NL intent, the failed code, the
+        exact error, and a targeted hint block selected by ``error_type`` so
+        the LLM receives focused repair guidance instead of generic instructions.
 
         Args:
             original_description: The user's original NL geometry description.
@@ -115,17 +170,24 @@ class PromptBuilder:
             error_message: Python traceback or validation error strings.
             iteration: Zero-based attempt index (shown in the prompt so the
                 model knows how many attempts have been made).
+            error_type: Coarse error category from ``repair.loop.classify_error()``.
+                One of the ``ERROR_*`` constants.  Defaults to ``"UNKNOWN"``.
 
         Returns:
             ``(system_prompt, user_prompt)`` ready to pass to
             ``LLMBackend.generate(user_prompt, system_prompt)``.
         """
         system = self._load("system_repair.txt", _DEFAULT_SYSTEM_REPAIR)
+
+        hint = self._ERROR_HINTS.get(error_type, "")
+        hint_block = f"\n{hint}\n" if hint else ""
+
         user = (
             f"ORIGINAL REQUEST:\n{original_description}\n\n"
             f"FAILED CODE (attempt {iteration + 1}):\n"
             f"```python\n{failed_code}\n```\n\n"
-            f"ERROR:\n{error_message}\n\n"
+            f"ERROR:\n{error_message}\n"
+            f"{hint_block}\n"
             "Return ONLY the corrected Python code inside a ```python block."
         )
         return system, user
