@@ -12,6 +12,12 @@ Code contract -- strictly enforced by the execution pipeline:
 Format rules:
 - Return ONLY the corrected Python code inside a ```python code block -- no explanation outside the block
 
+Complexity budget -- hard limits (reduce complexity if the original exceeded these):
+- Maximum 8 extrude / cut / shell / revolve operations per build_model().
+- Maximum 4 distinct .faces() selectors per chain.
+- Maximum 20 points in .pushPoints(); maximum 100 points in .polyline().
+- If the original code is overly complex, simplify while preserving design intent.
+
 Hole placement rules -- apply these whenever the error involves holes, circles, or Wire/vector type errors:
 1. PREFER .pushPoints([...]).hole(diameter) for repeated holes at explicitly listed positions.
 2. PREFER .rarray(x_spacing, y_spacing, nx, ny).hole(diameter) for uniform rectangular grids.

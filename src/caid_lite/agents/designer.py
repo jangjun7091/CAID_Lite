@@ -38,6 +38,14 @@ def _format_plan(plan: DesignPlan) -> str:
         lines.append(f"Constraints: {pairs}")
     if plan.notes:
         lines.append(f"Notes: {plan.notes}")
+    if plan.operations:
+        lines.append("Operation sequence (implement in this order):")
+        for i, op in enumerate(plan.operations, 1):
+            op_type = op.get("op", "?")
+            details = ", ".join(
+                f"{k}={v}" for k, v in op.items() if k != "op"
+            )
+            lines.append(f"  Step {i}: {op_type}" + (f" ({details})" if details else ""))
     return "\n".join(lines)
 
 

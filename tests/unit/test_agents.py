@@ -47,9 +47,26 @@ class TestDesignPlan:
         assert plan.geometry_type == "bracket"
         assert plan.features == []
 
+    def test_operations_default_empty(self):
+        plan = DesignPlan()
+        assert plan.operations == []
+
+    def test_operations_round_trip(self):
+        ops = [
+            {"op": "extrude", "profile": "rectangle", "depth_mm": 8},
+            {"op": "hole", "face": ">Z", "diameter_mm": 4.5},
+        ]
+        plan = DesignPlan(geometry_type="plate", operations=ops)
+        restored = DesignPlan.from_dict(plan.to_dict())
+        assert restored.operations == ops
+
+    def test_from_dict_missing_operations_defaults_to_empty(self):
+        plan = DesignPlan.from_dict({"geometry_type": "box", "features": ["a box"]})
+        assert plan.operations == []
+
     def test_to_dict_keys(self):
         d = DesignPlan().to_dict()
-        assert set(d.keys()) == {"features", "geometry_type", "constraints", "notes"}
+        assert set(d.keys()) == {"features", "geometry_type", "constraints", "notes", "operations"}
 
 
 # -- CriticResult --------------------------------------------------------------
@@ -86,6 +103,10 @@ _VALID_PLAN_JSON = json.dumps({
     "geometry_type": "plate",
     "constraints": {"width_mm": 60, "height_mm": 40},
     "notes": "corner holes only",
+    "operations": [
+        {"op": "extrude", "profile": "rectangle", "depth_mm": 6},
+        {"op": "hole", "face": ">Z", "diameter_mm": 4.5},
+    ],
 })
 
 
@@ -129,6 +150,24 @@ class TestArchitectAgent:
         fenced = f"```json\n{_VALID_PLAN_JSON}\n```"
         plan = _parse_plan(fenced)
         assert plan.geometry_type == "plate"
+
+    def test_plan_operations_parsed(self):
+        llm = MockLLMBackend(responses=[_VALID_PLAN_JSON])
+        agent = ArchitectAgent(llm=llm)
+        plan = agent.plan("a plate with holes")
+        assert len(plan.operations) == 2
+        assert plan.operations[0]["op"] == "extrude"
+        assert plan.operations[1]["op"] == "hole"
+
+    def test_plan_without_operations_key_gives_empty_list(self):
+        json_no_ops = json.dumps({
+            "features": ["a box"],
+            "geometry_type": "box",
+            "constraints": {},
+            "notes": "",
+        })
+        plan = _parse_plan(json_no_ops)
+        assert plan.operations == []
 
 
 # -- PatternSelector -----------------------------------------------------------
@@ -274,6 +313,38 @@ class TestDesignerAgent:
         assert "box" in text
         assert "outer shell" in text
         assert "width_mm=30" in text
+
+    def test_format_plan_includes_operations(self):
+        plan = DesignPlan(
+            geometry_type="plate",
+            operations=[
+                {"op": "extrude", "profile": "rectangle", "depth_mm": 8},
+                {"op": "hole", "face": ">Z", "diameter_mm": 4.5},
+            ],
+        )
+        text = _format_plan(plan)
+        assert "Step 1" in text
+        assert "extrude" in text
+        assert "Step 2" in text
+        assert "hole" in text
+        assert "diameter_mm=4.5" in text
+
+    def test_format_plan_no_operations_omits_section(self):
+        plan = DesignPlan(geometry_type="box")
+        text = _format_plan(plan)
+        assert "Operation sequence" not in text
+
+    def test_user_prompt_contains_operations(self):
+        llm = MockLLMBackend(responses=[_FENCED_CODE])
+        agent = DesignerAgent(llm=llm)
+        plan = DesignPlan(
+            geometry_type="plate",
+            operations=[{"op": "extrude", "depth_mm": 6}, {"op": "hole", "diameter_mm": 5}],
+        )
+        agent.generate("a plate with holes", plan, [])
+        user_prompt, _ = llm.calls[0]
+        assert "Step 1" in user_prompt
+        assert "extrude" in user_prompt
 
     def test_format_patterns_empty_list(self):
         assert _format_patterns([]) == ""

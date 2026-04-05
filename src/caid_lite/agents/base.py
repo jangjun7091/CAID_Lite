@@ -18,12 +18,22 @@ class DesignPlan:
                        (e.g. {"width_mm": 50, "thickness_mm": 5}).
         notes:         Free-form guidance for the Designer
                        (e.g. "use fillets on outer edges").
+        operations:    Ordered sketch-and-extrude operation sequence.
+                       Each entry is a dict with at minimum an "op" key.
+                       Examples:
+                         {"op": "extrude", "profile": "rectangle",
+                          "plane": "XY", "depth_mm": 8}
+                         {"op": "hole", "face": ">Z", "diameter_mm": 4.5}
+                         {"op": "fillet", "edge": "all", "radius_mm": 1.0}
+                       Empty list means no explicit operation sequence was
+                       produced (Designer falls back to features + constraints).
     """
 
     features: List[str] = field(default_factory=list)
     geometry_type: str = ""
     constraints: Dict[str, Any] = field(default_factory=dict)
     notes: str = ""
+    operations: List[Dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -31,6 +41,7 @@ class DesignPlan:
             "geometry_type": self.geometry_type,
             "constraints": self.constraints,
             "notes": self.notes,
+            "operations": self.operations,
         }
 
     @classmethod
@@ -40,6 +51,7 @@ class DesignPlan:
             geometry_type=data.get("geometry_type", ""),
             constraints=data.get("constraints", {}),
             notes=data.get("notes", ""),
+            operations=data.get("operations", []),
         )
 
 

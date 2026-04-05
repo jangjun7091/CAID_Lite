@@ -53,6 +53,14 @@ General style:
 - All dimensions in millimeters unless the prompt specifies otherwise.
 - Apply fillets and chamfers last, after all cuts and bosses.
 
+Complexity budget -- hard limits per build_model():
+- Maximum 8 extrude / cut / shell / revolve operations.
+- Maximum 4 distinct face selectors (.faces()) per chain.
+- Maximum 20 points in a single .pushPoints() call.
+- Maximum 100 points in a .polyline() call.
+- If the design plan specifies an "Operation sequence", implement those steps in order
+  and do not add extra operations beyond what is listed.
+
 Complex geometry -- mandatory fallback rules:
 - For any toothed part (gear, sprocket, rack): build the tooth profile as a 2D polyline
   in the XY workplane using math.cos/sin, then extrude. All points must be 2-tuples (x, y).
