@@ -23,6 +23,9 @@ avoid:
   - "Using the XY plane for an L profile that needs a Z component -- XZ or YZ is correct"
   - "Using .faces('>Z') for horizontal-leg holes -- '>Z' selects the TOP of the vertical leg (z=leg_h), NOT the horizontal leg surface"
   - "Using .faces('>Y') or .faces('<Y') for mounting holes -- those are the flat side faces, not the leg surfaces"
+  - "Returning rib as a separate Workplane from build_model() -- always .union() the rib into the bracket before returning"
+  - "Placing rib origin at (0,0) -- that puts it on the outer corner; rib must start at the inner corner (wall_t, wall_t)"
+  - "rib_base > leg_w - wall_t or rib_base > leg_h - wall_t -- rib must fit inside the bracket legs"
 
 parameters:
   leg_w:  {type: float, unit: mm, description: "Width of the horizontal leg"}
@@ -93,6 +96,28 @@ example: |
       )
 
       return bracket
+
+rib_construction: |
+  # Triangular reinforcement rib at the inner corner of the L-bracket
+  # The rib origin must be at the INNER corner (wall_t, wall_t), not (0, 0).
+  # All three bodies (bracket + rib) must be .union()-ed into ONE solid.
+
+  rib_base   = min(leg_w, leg_h) * 0.5  # must be <= leg dimension - wall_t
+  rib_height = rib_base
+  rib_t      = wall_t                    # same thickness as bracket
+
+  rib = (
+      cq.Workplane("XZ")
+      .moveTo(wall_t, wall_t)                    # start at inner corner
+      .lineTo(wall_t + rib_base, wall_t)         # horizontal edge
+      .lineTo(wall_t, wall_t + rib_height)       # diagonal hypotenuse
+      .close()
+      .extrude(rib_t)
+      .translate((0, (length - rib_t) / 2, 0))  # center along Y
+  )
+
+  result = bracket.union(rib)   # must be ONE solid before returning
+  return result
 
 repair_hints:
   - "Cannot extrude open wire: ensure .close() immediately follows .polyline()."

@@ -16,6 +16,7 @@ from caid_lite.validator.geometry import GeometryValidator, ValidationResult
 _VALID_METRICS = {
     "is_valid": True,
     "is_solid": True,
+    "body_count": 1,
     "volume": 1000.0,
     "face_count": 6,
     "bbox": [10.0, 10.0, 10.0],
@@ -102,6 +103,22 @@ class TestGeometryValidatorHardChecks:
 
     def test_volume_just_above_threshold_passes(self, validator):
         result = validator.validate(_metrics(volume=1e-5))
+        assert result.valid is True
+
+    def test_disconnected_bodies_fails(self, validator):
+        result = validator.validate(_metrics(body_count=3))
+        assert result.valid is False
+        assert any("disconnected" in e for e in result.errors)
+
+    def test_single_body_passes(self, validator):
+        result = validator.validate(_metrics(body_count=1))
+        assert result.valid is True
+        assert not any("disconnected" in e for e in result.errors)
+
+    def test_body_count_none_does_not_fail(self, validator):
+        """body_count 필드가 없으면 (구버전 runner) 에러 없이 통과."""
+        m = {k: v for k, v in _VALID_METRICS.items() if k != "body_count"}
+        result = validator.validate(m)
         assert result.valid is True
 
     def test_multiple_hard_failures_all_reported(self, validator):

@@ -71,6 +71,15 @@ L-bracket face selectors (XZ-plane polyline, extruded along +Y):
 - NEVER use .faces(">Z") for horizontal-leg holes — ">Z" selects the TOP of the vertical leg
   (z=leg_h), NOT the top surface of the horizontal leg.
 
+Triangular rib on L-bracket (reinforcement rib between the two legs):
+- The rib is a right-triangle in the XZ plane; extrude along +Y with thickness = wall_t.
+- Start the triangle at the INNER corner (wall_t, wall_t) — NOT at (0, 0) which is outside.
+- rib_base = min(leg_w, leg_h) * 0.5; rib must fit entirely within the bracket legs.
+- Center rib along Y: .translate((0, (length - wall_t) / 2, 0))
+- ALWAYS union the rib into the bracket: result = bracket.union(rib)
+- NEVER return the rib as a separate body — final build_model() must return 1 solid.
+- Rule: body_count > 1 means .union() was missing or .translate() was wrong.
+
 Complex geometry -- mandatory fallback rules:
 - For any toothed part (gear, sprocket, rack): build the tooth profile as a 2D polyline
   in the XY workplane using math.cos/sin, then extrude. All points must be 2-tuples (x, y).

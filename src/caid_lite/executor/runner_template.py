@@ -161,6 +161,7 @@ def _run() -> dict:
         validation_metrics = {
             "is_valid":     shape.isValid(),
             "is_solid":     isinstance(shape, (cq.Solid, cq.Compound)) and len(shape.Solids()) > 0,
+            "body_count":   len(shape.Solids()),
             "volume":       shape.Volume(),
             "face_count":   len(shape.Faces()),
             "bbox":         bbox_dims,

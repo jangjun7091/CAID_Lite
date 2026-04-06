@@ -137,6 +137,15 @@ class GeometryValidator:
                 "are valid on an existing solid."
             )
 
+        body_count = metrics.get("body_count")
+        if body_count is not None and body_count > 1:
+            errors.append(
+                f"Model has {body_count} disconnected solid bodies (expected 1). "
+                "All parts must be joined into a single solid with .union(). "
+                "Ensure each body's .translate() offset positions it flush against "
+                "the adjacent body (sharing a face) before calling .union()."
+            )
+
         volume = float(metrics.get("volume") or 0.0)
         if volume <= self._MIN_VOLUME:
             errors.append(
