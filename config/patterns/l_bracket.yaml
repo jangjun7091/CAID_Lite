@@ -26,6 +26,8 @@ avoid:
   - "Returning rib as a separate Workplane from build_model() -- always .union() the rib into the bracket before returning"
   - "Placing rib origin at (0,0) -- that puts it on the outer corner; rib must start at the inner corner (wall_t, wall_t)"
   - "rib_base > leg_w - wall_t or rib_base > leg_h - wall_t -- rib must fit inside the bracket legs"
+  - "rib_base = min(leg_w, leg_h) * 0.5 as a fixed value -- always scale by load_class (0.20/0.30/0.45)"
+  - "Adding a rib when load_class=light and wall_t >= min(leg_w,leg_h)/5 -- wall alone is sufficient"
 
 parameters:
   leg_w:  {type: float, unit: mm, description: "Width of the horizontal leg"}
@@ -98,13 +100,23 @@ example: |
       return bracket
 
 rib_construction: |
-  # Triangular reinforcement rib at the inner corner of the L-bracket
-  # The rib origin must be at the INNER corner (wall_t, wall_t), not (0, 0).
-  # All three bodies (bracket + rib) must be .union()-ed into ONE solid.
+  # Triangular reinforcement rib — size scaled to load class from constraints["load_class"].
+  # load_class determines rib_base as a fraction of min(leg_w, leg_h):
+  #   "light"  → 0.20  (sensor/electronics bracket, < 2 kg)
+  #   "medium" → 0.30  (general mechanical, default)
+  #   "heavy"  → 0.45  (motor mount / structural, > 10 kg)
+  #
+  # Omit rib entirely when:
+  #   constraints["rib"] == "none"
+  #   OR (load_class == "light" AND wall_t >= min(leg_w, leg_h) / 5)
 
-  rib_base   = min(leg_w, leg_h) * 0.5  # must be <= leg dimension - wall_t
-  rib_height = rib_base
-  rib_t      = wall_t                    # same thickness as bracket
+  _RIB_RATIO = {"light": 0.20, "medium": 0.30, "heavy": 0.45}
+  load_class = constraints.get("load_class", "medium")
+  rib_ratio  = _RIB_RATIO.get(load_class, 0.30)
+
+  rib_base   = min(leg_w, leg_h) * rib_ratio   # duty-scaled, not fixed
+  rib_height = rib_base                          # square = optimal bending resistance
+  rib_t      = wall_t                            # same thickness as bracket
 
   rib = (
       cq.Workplane("XZ")

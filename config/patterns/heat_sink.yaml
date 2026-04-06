@@ -1,0 +1,82 @@
+name: heat_sink
+category: thermal
+purpose: "Rectangular aluminium heat sink — flat base with parallel cooling fins."
+
+when_to_use: >-
+  Any heat dissipation component with a flat base and parallel fins. Use for
+  CPU/GPU coolers, motor driver heat sinks, power electronics, LED heatsinks.
+
+idiom: |
+  # ALL fins in ONE operation using rarray — result is always 1 solid
+  base = cq.Workplane("XY").box(base_l, base_w, base_t)
+  n_fins      = 8
+  fin_spacing = base_w / (n_fins + 1)   # equal margins on both ends
+  result = (
+      base
+      .faces(">Z").workplane()
+      .rarray(1, fin_spacing, 1, n_fins)
+      .rect(base_l, fin_t)
+      .extrude(fin_h)
+  )
+
+avoid:
+  - "Building fins in a Python for-loop and calling .union() each iteration — use rarray instead"
+  - "Creating each fin as a separate cq.Workplane and returning a Compound — body_count will be > 1"
+  - "Using .add() to combine fins — .add() creates a Compound of separate solids, not 1 solid"
+  - "Placing fins with .pushPoints() — rarray is the correct API for uniform repeated extrusions"
+  - "fin_spacing = base_w / n_fins — this packs fins edge-to-edge; use base_w / (n_fins + 1)"
+
+parameters:
+  base_l:  {type: float, unit: mm, description: "Base plate length (X)"}
+  base_w:  {type: float, unit: mm, description: "Base plate width (Y)"}
+  base_t:  {type: float, unit: mm, description: "Base plate thickness"}
+  fin_h:   {type: float, unit: mm, description: "Fin height above base"}
+  fin_t:   {type: float, unit: mm, description: "Fin thickness"}
+  n_fins:  {type: int,   unit: "",  description: "Number of cooling fins"}
+  hole_d:  {type: float, unit: mm, description: "Mounting hole diameter (optional)"}
+  margin:  {type: float, unit: mm, description: "Mounting hole inset from corner"}
+
+example: |
+  import cadquery as cq
+
+
+  def build_model():
+      base_l  = 80.0   # base length (mm)
+      base_w  = 60.0   # base width (mm)
+      base_t  =  5.0   # base thickness (mm)
+      fin_h   = 20.0   # fin height (mm)
+      fin_t   =  2.0   # fin thickness (mm)
+      n_fins  =  8     # number of fins
+      hole_d  =  3.4   # M3 mounting hole diameter (mm)
+      margin  =  6.0   # hole inset from each corner (mm)
+
+      # Step 1: flat base plate
+      base = cq.Workplane("XY").box(base_l, base_w, base_t)
+
+      # Step 2: ALL fins in one rarray operation — always produces 1 solid
+      fin_spacing = base_w / (n_fins + 1)   # equal margins on both sides
+      result = (
+          base
+          .faces(">Z").workplane()
+          .rarray(1, fin_spacing, 1, n_fins)
+          .rect(base_l, fin_t)
+          .extrude(fin_h)
+      )
+
+      # Step 3: mounting holes from bottom face
+      hx = base_l / 2 - margin
+      hy = base_w / 2 - margin
+      result = (
+          result
+          .faces("<Z").workplane()
+          .pushPoints([( hx,  hy), (-hx,  hy),
+                       ( hx, -hy), (-hx, -hy)])
+          .hole(hole_d)
+      )
+
+      return result
+
+repair_hints:
+  - "body_count > 1: fins were built as separate bodies. Rewrite using .rarray(1, fin_spacing, 1, n_fins).rect(base_l, fin_t).extrude(fin_h) on .faces('>Z')."
+  - "fin_spacing too large or fins overlap: ensure fin_spacing = base_w / (n_fins + 1), not base_w / n_fins."
+  - "Fins not attached to base: use .faces('>Z').workplane() before rarray so fins extrude from the base surface."

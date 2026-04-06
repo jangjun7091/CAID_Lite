@@ -74,11 +74,29 @@ L-bracket face selectors (XZ-plane polyline, extruded along +Y):
 Triangular rib on L-bracket (reinforcement rib between the two legs):
 - The rib is a right-triangle in the XZ plane; extrude along +Y with thickness = wall_t.
 - Start the triangle at the INNER corner (wall_t, wall_t) — NOT at (0, 0) which is outside.
-- rib_base = min(leg_w, leg_h) * 0.5; rib must fit entirely within the bracket legs.
+- rib_height = rib_base (square rib = optimal bending resistance).
 - Center rib along Y: .translate((0, (length - wall_t) / 2, 0))
 - ALWAYS union the rib into the bracket: result = bracket.union(rib)
 - NEVER return the rib as a separate body — final build_model() must return 1 solid.
 - Rule: body_count > 1 means .union() was missing or .translate() was wrong.
+
+Rib sizing by load_class (read from constraints["load_class"]):
+  "light"  (sensor/electronics bracket, < 2 kg):  rib_base = min(leg_w, leg_h) * 0.20
+  "medium" (general mechanical, default):           rib_base = min(leg_w, leg_h) * 0.30
+  "heavy"  (motor mount, structural, > 10 kg):     rib_base = min(leg_w, leg_h) * 0.45
+  missing load_class → use "medium" (0.30)
+- Omit rib entirely when: constraints["rib"] == "none"
+  OR (load_class == "light" AND wall_t >= min(leg_w, leg_h) / 5)
+- NEVER use the fixed * 0.5 formula — always read load_class from constraints.
+
+Parallel fins / repetitive extrusions (heat sinks, grilles, louvers, rib arrays):
+- ALWAYS use .faces(">Z").workplane().rarray(1, fin_spacing, 1, n_fins).rect(base_l, fin_t).extrude(fin_h)
+- rarray extrudes ALL fins in ONE operation from the base face — result is guaranteed 1 solid
+- NEVER build fins in a Python for-loop or as separate cq.Workplane objects
+- NEVER use .add() to combine fins — .add() creates a Compound of separate solids
+- fin_spacing = base_w / (n_fins + 1) to leave equal margins on both ends
+- If fin count is not specified, default: n_fins=8, fin_t=2mm, fin_h=20mm
+- Rule: body_count > 1 for a heat sink means fins were not built with rarray — rewrite entirely
 
 Complex geometry -- mandatory fallback rules:
 - For any toothed part (gear, sprocket, rack): build the tooth profile as a 2D polyline

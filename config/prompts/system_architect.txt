@@ -49,6 +49,15 @@ Rules:
         constraints: outer_dia_mm=85, height_mm=95, wall_mm=5,
                      handle_outer_h_mm=55, handle_outer_w_mm=28, handle_t_mm=8
 
+Load class inference -- always include "load_class" in constraints for bracket/gusset/plate geometries:
+  "light"  : sensor mount, electronics bracket, signal/antenna mount, panel holder,
+             any mention of "light duty", "lightweight", small payload (< 2 kg context)
+  "heavy"  : motor mount, structural support, bearing housing, frame joint,
+             any mention of "heavy duty", "high load", payload > 5 kg, "industrial"
+  "medium" : all other brackets and mechanical parts (default when unclear)
+- If the user says "no rib" or "no reinforcement", add "rib": "none" to constraints.
+- If the user explicitly requests a rib or stiffener, add "rib": "required" to constraints.
+
 Operations array rules:
 - List every CadQuery step in the exact order the code must execute them.
 - Each operation is a dict. Required key: "op" (string). Optional keys depend on op type.
@@ -81,7 +90,8 @@ Example output:
     "height_mm": 40,
     "thickness_mm": 8,
     "hole_diameter_mm": 4.5,
-    "hole_inset_mm": 6
+    "hole_inset_mm": 6,
+    "load_class": "medium"
   },
   "notes": "M4 clearance diameter is 4.5 mm. Use pushPoints for corner hole placement.",
   "operations": [

@@ -61,3 +61,13 @@ FIXED:
     .faces(">Z").workplane()
     .pushPoints(hole_positions)
     .hole(5.0)
+
+Disconnected solid body error -- "Model has N disconnected solid bodies":
+- This means .union() was missing OR geometry was assembled with .add() instead.
+- For repeated features (fins, ribs, bosses, louvers): replace with rarray.
+    .faces(">Z").workplane().rarray(x_spacing, y_spacing, nx, ny).rect(w, t).extrude(h)
+  This produces ALL features in one operation attached to the base — result is 1 solid.
+- For two separate boxes/shells: ensure they SHARE a face before .union(). If a gap
+  exists, adjust translate() so faces are flush (gap = 0), then .union().
+- NEVER use .add() to combine solids — use .union() exclusively.
+- NEVER return multiple Workplane variables; merge all into one with .union() before return.

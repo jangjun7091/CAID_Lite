@@ -92,6 +92,15 @@ _KEYWORD_MAP: Dict[str, List[str]] = {
     "grid":        ["hole_rarray"],
     "rarray":      ["hole_rarray"],
     "pushpoints":  ["hole_pushpoints"],
+    # Heat sinks / thermal
+    "heat_sink":   ["heat_sink"],
+    "heatsink":    ["heat_sink"],
+    "방열판":      ["heat_sink"],
+    "fin":         ["heat_sink"],
+    "cooling":     ["heat_sink"],
+    "thermal":     ["heat_sink", "plate"],
+    "cooler":      ["heat_sink"],
+    "dissipat":    ["heat_sink"],
 }
 
 
