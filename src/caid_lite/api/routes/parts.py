@@ -1,13 +1,18 @@
-"""GET/DELETE /api/parts — parts shelf CRUD."""
+"""GET/PATCH/DELETE /api/parts — parts shelf CRUD."""
 
 from __future__ import annotations
 
 from typing import Any, Dict, List
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 
 from ..deps import get_manager
 from ...session.manager import SessionManager
+
+
+class PartPatch(BaseModel):
+    name: str
 
 router = APIRouter(tags=["parts"])
 
@@ -27,6 +32,19 @@ def get_part(
     if part is None:
         raise HTTPException(status_code=404, detail=f"Part '{part_id}' not found.")
     return part.to_dict()
+
+
+@router.patch("/parts/{part_id}", response_model=Dict[str, Any])
+def patch_part(
+    part_id: str,
+    body: PartPatch,
+    manager: SessionManager = Depends(get_manager),
+) -> Dict[str, Any]:
+    """Rename a part."""
+    if not manager.rename_part(part_id, body.name):
+        raise HTTPException(status_code=404, detail=f"Part '{part_id}' not found.")
+    part = manager.get_part(part_id)
+    return part.to_dict()  # type: ignore[union-attr]
 
 
 @router.delete("/parts/{part_id}", status_code=204)

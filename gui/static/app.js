@@ -61,6 +61,8 @@ const $codeModalClose  = document.getElementById("code-modal-close");
 const $codeModalTitle  = document.getElementById("code-modal-title");
 const $codeContent     = document.getElementById("code-content");
 const $codeCopyBtn     = document.getElementById("code-copy-btn");
+const $errorPanel      = document.getElementById("error-panel");
+const $errorPanelBody  = document.getElementById("error-panel-body");
 
 // ── Three.js — Main Renderer ──────────────────────────────────────────────────
 const renderer = new THREE.WebGLRenderer({ canvas: $canvas, antialias: true });
@@ -265,6 +267,13 @@ function showPlaceholder(msg = "Select a ready part to preview") {
   $partInfo.classList.remove("visible");
   $downloadBar.classList.remove("visible");
   $dimBadge.classList.add("hidden");
+  $errorPanel.classList.add("hidden");
+}
+
+function showErrorPanel(errorText) {
+  $placeholderText.textContent = "Generation failed";
+  $errorPanelBody.textContent = errorText || "Unknown error";
+  $errorPanel.classList.remove("hidden");
 }
 
 function updatePartInfo(partId) {
@@ -368,7 +377,10 @@ function renderShelf() {
     const pipelineHtml = buildPipelineSteps(part);
 
     li.innerHTML = `
-      <span class="part-name">${escHtml(part.name)}</span>
+      <div class="part-name-row">
+        <span class="part-name" title="Click to rename">${escHtml(part.name)}</span>
+        <button class="refine-btn" data-id="${part.id}" title="Pre-fill chat with this prompt">Refine</button>
+      </div>
       <span class="part-prompt">${escHtml(part.prompt)}</span>
       <div class="part-status-row">
         ${spinnerHtml}<span class="part-badge badge-${part.status}">${part.status}</span>
@@ -377,6 +389,18 @@ function renderShelf() {
       ${pipelineHtml}`;
 
     li.addEventListener("click", () => selectPart(part.id));
+
+    li.querySelector(".refine-btn").addEventListener("click", (e) => {
+      e.stopPropagation();
+      $chatInput.value = state.parts[part.id]?.prompt ?? "";
+      $chatInput.focus();
+    });
+
+    li.querySelector(".part-name").addEventListener("click", (e) => {
+      e.stopPropagation();
+      startRename(part.id, li.querySelector(".part-name"));
+    });
+
     $partsList.appendChild(li);
   }
 }
@@ -387,20 +411,28 @@ function renderShelf() {
  */
 function buildPipelineSteps(part) {
   const stages = ["Plan", "Code", "Run", "Validate"];
-  const statusOrder = { generating: 1, validating: 3, repairing: 4, ready: 5, failed: -1 };
+  const statusOrder = { generating: 1, validating: 3, repairing: 4, ready: 5 };
+  const isFailed = part.status === "failed";
   const progress = statusOrder[part.status] ?? 0;
 
   const steps = stages.map((label, idx) => {
     const stepNum = idx + 1;
     let cls = "";
-    if (part.status === "failed")   cls = stepNum <= progress - 1 ? "done" : stepNum === progress ? "error" : "";
-    else if (stepNum < progress)    cls = "done";
-    else if (stepNum === progress)  cls = part.status === "ready" ? "done" : "active";
+    if (isFailed) {
+      // repair_iterations > 0 → all 4 steps done, repair badge shows error
+      // otherwise → first 3 done, validate shows error (most common failure point)
+      if (part.repair_iterations > 0) cls = "done";
+      else                             cls = stepNum < 4 ? "done" : "error";
+    } else if (stepNum < progress) {
+      cls = "done";
+    } else if (stepNum === progress) {
+      cls = part.status === "ready" ? "done" : "active";
+    }
     return `<span class="pipeline-step ${cls}">${label}</span>`;
   });
 
   if (part.repair_iterations > 0) {
-    const repairCls = part.status === "ready" ? "done" : part.status === "repairing" ? "active" : "";
+    const repairCls = isFailed ? "error" : part.status === "ready" ? "done" : part.status === "repairing" ? "active" : "";
     steps.push(`<span class="pipeline-step ${repairCls}">Repair×${part.repair_iterations}</span>`);
   }
 
@@ -420,8 +452,8 @@ function selectPart(id) {
   if (part.status === "ready") {
     loadSTL(id);
   } else if (part.status === "failed") {
-    // Show error details in viewport
-    showPlaceholder(part.error ? `Failed: ${part.error.slice(0, 120)}` : "Generation failed — see chat for details");
+    showPlaceholder();
+    showErrorPanel(part.error);
     $partInfo.classList.remove("visible");
     $downloadBar.classList.remove("visible");
   } else {
@@ -487,7 +519,8 @@ function connectSSE() {
       renderShelf();
       appendStatusMsg(`"${data.name}" failed: ${data.error || "unknown error"}`, "error");
       if (state.activePart === data.id) {
-        showPlaceholder(data.error ? `Failed: ${data.error.slice(0, 120)}` : "Generation failed");
+        showPlaceholder();
+        showErrorPanel(data.error);
       }
       return;
     }
@@ -572,6 +605,45 @@ function appendStatusMsg(text, variant = "status") {
   div.innerHTML = `<div class="msg-body">${escHtml(text)}</div>`;
   $chatMessages.appendChild(div);
   $chatMessages.scrollTop = $chatMessages.scrollHeight;
+}
+
+// ── Part name inline rename ───────────────────────────────────────────────────
+async function startRename(partId, nameEl) {
+  const part = state.parts[partId];
+  if (!part) return;
+
+  const input = document.createElement("input");
+  input.type = "text";
+  input.value = part.name;
+  input.className = "rename-input";
+  nameEl.replaceWith(input);
+  input.focus();
+  input.select();
+
+  async function commitRename() {
+    const newName = input.value.trim();
+    if (newName && newName !== part.name) {
+      try {
+        const res = await fetch(`/api/parts/${partId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: newName }),
+        });
+        if (res.ok) {
+          const updated = await res.json();
+          state.parts[partId] = { ...state.parts[partId], name: updated.name };
+          if (state.activePart === partId) $partInfoName.textContent = updated.name;
+        }
+      } catch { /* network error — revert silently */ }
+    }
+    renderShelf();
+  }
+
+  input.addEventListener("blur", commitRename);
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter")  { e.preventDefault(); input.blur(); }
+    if (e.key === "Escape") { input.value = part.name; input.blur(); }
+  });
 }
 
 // ── Utilities ─────────────────────────────────────────────────────────────────

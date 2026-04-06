@@ -132,6 +132,16 @@ class SessionManager:
         self._state.parts = [p for p in self._state.parts if p.id != part_id]
         return True
 
+    def rename_part(self, part_id: str, new_name: str) -> bool:
+        """Rename a part.  Returns True if the part was found and renamed."""
+        part = self._state.get_part(part_id)
+        if part is None:
+            return False
+        stripped = new_name.strip()
+        if stripped:
+            part.name = stripped
+        return True
+
     def get_chat_history(self) -> List[ChatMessage]:
         """Return the full chat history."""
         return list(self._state.chat_history)
