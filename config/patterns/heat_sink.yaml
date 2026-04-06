@@ -9,11 +9,13 @@ when_to_use: >-
 idiom: |
   # ALL fins in ONE operation using rarray — result is always 1 solid
   base = cq.Workplane("XY").box(base_l, base_w, base_t)
-  n_fins      = 8
-  fin_spacing = base_w / (n_fins + 1)   # equal margins on both ends
+  n_fins      = int(8)             # MUST be int — rarray count args reject float
+  fin_spacing = base_w / (n_fins + 1)   # float OK — spacing, not a count
   result = (
       base
       .faces(">Z").workplane()
+      # rarray(x_spacing, y_spacing, x_count, y_count)
+      # x_count=1 (single column), y_count=n_fins (int!)
       .rarray(1, fin_spacing, 1, n_fins)
       .rect(base_l, fin_t)
       .extrude(fin_h)
@@ -25,6 +27,8 @@ avoid:
   - "Using .add() to combine fins — .add() creates a Compound of separate solids, not 1 solid"
   - "Placing fins with .pushPoints() — rarray is the correct API for uniform repeated extrusions"
   - "fin_spacing = base_w / n_fins — this packs fins edge-to-edge; use base_w / (n_fins + 1)"
+  - "Passing a float as nx or ny to rarray — TypeError: 'float' cannot be interpreted as int. Always declare n_fins = int(8) or cast n_fins = int(n_fins) before rarray"
+  - "rarray(1, 0, num_fins, pitch) — y_spacing=0 stacks all fins at the same point and pitch is a float used as ny count. Correct form: rarray(1, fin_spacing, 1, int(n_fins))"
 
 parameters:
   base_l:  {type: float, unit: mm, description: "Base plate length (X)"}
@@ -46,7 +50,7 @@ example: |
       base_t  =  5.0   # base thickness (mm)
       fin_h   = 20.0   # fin height (mm)
       fin_t   =  2.0   # fin thickness (mm)
-      n_fins  =  8     # number of fins
+      n_fins  =  8     # number of fins — MUST be int (rarray count arg)
       hole_d  =  3.4   # M3 mounting hole diameter (mm)
       margin  =  6.0   # hole inset from each corner (mm)
 
@@ -80,3 +84,4 @@ repair_hints:
   - "body_count > 1: fins were built as separate bodies. Rewrite using .rarray(1, fin_spacing, 1, n_fins).rect(base_l, fin_t).extrude(fin_h) on .faces('>Z')."
   - "fin_spacing too large or fins overlap: ensure fin_spacing = base_w / (n_fins + 1), not base_w / n_fins."
   - "Fins not attached to base: use .faces('>Z').workplane() before rarray so fins extrude from the base surface."
+  - "TypeError: 'float' object cannot be interpreted as an integer: n_fins or another rarray count arg is a float. Cast it: n_fins = int(n_fins). Check that you are not passing pitch/spacing as a count argument."

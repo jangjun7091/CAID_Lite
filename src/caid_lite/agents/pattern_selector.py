@@ -96,11 +96,17 @@ _KEYWORD_MAP: Dict[str, List[str]] = {
     "heat_sink":   ["heat_sink"],
     "heatsink":    ["heat_sink"],
     "방열판":      ["heat_sink"],
+    "히트싱크":    ["heat_sink"],
+    "방열":        ["heat_sink"],
+    "냉각":        ["heat_sink"],
+    "쿨러":        ["heat_sink"],
     "fin":         ["heat_sink"],
     "cooling":     ["heat_sink"],
     "thermal":     ["heat_sink", "plate"],
     "cooler":      ["heat_sink"],
     "dissipat":    ["heat_sink"],
+    "gpu":         ["heat_sink"],
+    "cpu":         ["heat_sink"],
 }
 
 

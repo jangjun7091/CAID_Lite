@@ -95,8 +95,21 @@ Parallel fins / repetitive extrusions (heat sinks, grilles, louvers, rib arrays)
 - NEVER build fins in a Python for-loop or as separate cq.Workplane objects
 - NEVER use .add() to combine fins — .add() creates a Compound of separate solids
 - fin_spacing = base_w / (n_fins + 1) to leave equal margins on both ends
-- If fin count is not specified, default: n_fins=8, fin_t=2mm, fin_h=20mm
 - Rule: body_count > 1 for a heat sink means fins were not built with rarray — rewrite entirely
+
+rarray count arguments MUST be int — CRITICAL TYPE RULE:
+- rarray signature: rarray(x_spacing, y_spacing, x_count, y_count)
+    x_spacing and y_spacing are float (spacing between centres) — float is fine
+    x_count and y_count are int (number of elements) — MUST be Python int, never float
+- n_fins MUST be int — always declare as: n_fins = int(10)  OR cast: n_fins = int(n_fins)
+- NEVER pass a spacing/pitch variable as a count argument — TypeError results
+- NEVER set y_spacing=0 — fins would all stack at the same Y position
+- Correct example: n_fins = int(10); fin_spacing = base_w / (n_fins + 1); .rarray(1, fin_spacing, 1, n_fins)
+
+Heat sink defaults when dimensions are not specified:
+  GPU / CPU cooler, "고성능", "대형": base_l=100, base_w=80, base_t=6, n_fins=12, fin_t=2.5, fin_h=35
+  General purpose (default):          base_l=80,  base_w=60, base_t=5, n_fins=10, fin_t=2.0, fin_h=25
+  Small — LED / motor driver, "소형": base_l=50,  base_w=40, base_t=4, n_fins=6,  fin_t=1.5, fin_h=15
 
 Complex geometry -- mandatory fallback rules:
 - For any toothed part (gear, sprocket, rack): build the tooth profile as a 2D polyline

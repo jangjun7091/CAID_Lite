@@ -48,6 +48,26 @@ Rules:
         geometry_type="mug",
         constraints: outer_dia_mm=85, height_mm=95, wall_mm=5,
                      handle_outer_h_mm=55, handle_outer_w_mm=28, handle_t_mm=8
+    heat_sink / heatsink / 방열판 / 히트싱크 / cooler / 쿨러 / 냉각기 / 방열기:
+        geometry_type="heat_sink"
+        GPU cooler / CPU cooler / 고성능 / 대형 / "GPU" in prompt:
+            constraints: base_l=100, base_w=80, base_t=6, fin_h=35, fin_t=2.5, n_fins=12
+        General purpose (default when size not stated):
+            constraints: base_l=80, base_w=60, base_t=5, fin_h=25, fin_t=2.0, n_fins=10
+        Small / LED / motor driver / 소형:
+            constraints: base_l=50, base_w=40, base_t=4, fin_h=15, fin_t=1.5, n_fins=6
+        IMPORTANT: always output n_fins as an INTEGER in constraints (e.g. "n_fins": 10, not 10.0)
+    fan_blade / 선풍기 날개 / 팬 / fan:
+        geometry_type="fan_blade",
+        constraints: radius_mm=80, n_blades=5, hub_radius_mm=15, blade_width_mm=20, blade_thickness_mm=3
+    enclosure / 인클로저 / 케이스 / case (with hollow interior):
+        geometry_type="box",
+        constraints: length_mm=100, width_mm=80, height_mm=60, wall_t_mm=3
+        notes: "use .shell() to hollow out after boxing"
+    knob / 노브 / 손잡이 / dial:
+        geometry_type="cylinder",
+        constraints: radius_mm=15, height_mm=20
+        notes: "chamfer top edge; add knurling or grip feature if requested"
 
 Load class inference -- always include "load_class" in constraints for bracket/gusset/plate geometries:
   "light"  : sensor mount, electronics bracket, signal/antenna mount, panel holder,
