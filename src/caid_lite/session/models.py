@@ -38,6 +38,7 @@ class PartEntry:
     thumbnail_url: Optional[str] = None
     repair_iterations: int = 0
     error: Optional[str] = None
+    design_plan: Optional[Dict[str, Any]] = None   # DesignPlan.to_dict() — multi-agent 시에만
 
     def is_terminal(self) -> bool:
         """Return True if this part has reached a final (non-transitional) state."""
@@ -57,6 +58,7 @@ class PartEntry:
             "thumbnail_url": self.thumbnail_url,
             "repair_iterations": self.repair_iterations,
             "error": self.error,
+            "design_plan": self.design_plan,
         }
 
 

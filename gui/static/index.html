@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CAID Lite</title>
-  <link rel="stylesheet" href="style.css?v=3">
+  <link rel="stylesheet" href="style.css?v=4">
   <!-- highlight.js — Python syntax colouring for code modal -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github-dark.min.css">
   <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/highlight.min.js"></script>
@@ -138,6 +138,29 @@
     </div>
   </div>
 
-  <script type="module" src="app.js?v=3"></script>
+  <!-- ── Refine Modal ──────────────────────────────────────────────────────── -->
+  <div id="refine-modal" class="hidden" role="dialog" aria-modal="true" aria-label="Edit dimensions">
+    <div id="refine-modal-panel">
+      <div id="refine-modal-header">
+        <span id="refine-modal-title">Edit Dimensions</span>
+        <button id="refine-modal-close" class="modal-close-btn" title="Close (Esc)">✕</button>
+      </div>
+      <div id="refine-modal-body">
+        <p class="refine-hint">Modify numeric constraints and click Apply to regenerate.</p>
+        <div id="refine-fields"></div>
+      </div>
+      <div id="refine-modal-footer">
+        <span id="refine-error" class="refine-error hidden"></span>
+        <div id="refine-footer-actions">
+          <button id="refine-cancel-btn" class="modal-action-btn">Cancel</button>
+          <button id="refine-apply-btn" class="modal-action-btn refine-apply">
+            Apply &amp; Regenerate
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="app.js?v=4"></script>
 </body>
 </html>

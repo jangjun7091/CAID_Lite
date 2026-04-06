@@ -146,6 +146,61 @@ class SessionManager:
         """Return the full chat history."""
         return list(self._state.chat_history)
 
+    async def modify_constraints(
+        self, part_id: str, constraints: Dict[str, Any]
+    ) -> str:
+        """Update a part's constraints and re-run from the Designer stage.
+
+        Skips ArchitectAgent — reuses the stored ``DesignPlan`` with merged
+        constraints.  Emits the same SSE events as a normal generation run.
+
+        Args:
+            part_id: ID of the part to refine.
+            constraints: Key/value pairs to merge into ``design_plan.constraints``.
+                         Only numeric (int/float) values are expected; the API
+                         layer enforces this via Pydantic.
+
+        Returns:
+            The same ``part_id`` (part is updated in-place).
+
+        Raises:
+            ValueError: Part not found, still generating, or has no design_plan.
+        """
+        import copy
+
+        part = self._state.get_part(part_id)
+        if part is None:
+            raise ValueError(f"Part '{part_id}' not found.")
+        if part.status not in ("ready", "failed"):
+            raise ValueError(
+                f"Part '{part_id}' is still {part.status}. "
+                "Wait for generation to complete before refining."
+            )
+        if part.design_plan is None:
+            raise ValueError(
+                f"Part '{part_id}' has no design plan. "
+                "Refine requires multi-agent mode (agents.enabled: true in config)."
+            )
+
+        # Merge new constraints into a deep copy of the stored plan
+        updated_plan = copy.deepcopy(part.design_plan)
+        updated_plan.setdefault("constraints", {}).update(constraints)
+
+        # Reset part state for re-generation
+        part.status = "generating"
+        part.error = None
+        part.code = None
+        part.validation = None
+        part.exports = {}
+        part.repair_iterations = 0
+        part.design_plan = updated_plan   # persist merged plan immediately
+
+        self.emit("part.status_changed", {"id": part_id, "status": "generating"})
+        asyncio.create_task(
+            self._run_pipeline_with_plan(part_id, part.prompt, updated_plan)
+        )
+        return part_id
+
     # ------------------------------------------------------------------
     # Generation dispatch
     # ------------------------------------------------------------------
@@ -182,6 +237,25 @@ class SessionManager:
         asyncio.create_task(self._run_pipeline(part_id, prompt))
         return part_id
 
+    async def _run_pipeline_with_plan(
+        self, part_id: str, prompt: str, design_plan: Dict[str, Any]
+    ) -> None:
+        """Background task: run_with_plan and update part status via SSE."""
+        part = self._state.get_part(part_id)
+        if part is None:
+            return
+
+        try:
+            result: PipelineResult = await asyncio.to_thread(
+                self._pipeline.run_with_plan, prompt, design_plan
+            )
+        except Exception as exc:
+            _log.error(f"[{part_id[:8]}] Unhandled run_with_plan exception: {exc}")
+            self._finalise_part(part, success=False, result=None, error=str(exc))
+            return
+
+        self._finalise_part(part, success=result.success, result=result)
+
     async def _run_pipeline(self, part_id: str, prompt: str) -> None:
         """Background task: run the pipeline and update part status via SSE."""
         part = self._state.get_part(part_id)
@@ -216,6 +290,9 @@ class SessionManager:
             part.repair_iterations = (
                 result.repair["iterations"] if result.repair else 0
             )
+            # DesignPlan 저장 (치수 수정 재생성 지원)
+            if result.design_plan is not None:
+                part.design_plan = result.design_plan
 
             # Emit intermediate status events based on what happened
             if result.validation is not None:

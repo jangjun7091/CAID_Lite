@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Union
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -13,6 +13,16 @@ from ...session.manager import SessionManager
 
 class PartPatch(BaseModel):
     name: str
+
+
+class RefineRequest(BaseModel):
+    """POST /api/parts/{id}/refine 요청 바디.
+
+    Pydantic이 Union[int, float] 타입으로 string 값을 자동 거부하므로
+    geometry_type 등의 string constraint 필드를 우발적으로 덮어쓰는 것을 방지한다.
+    """
+
+    constraints: Dict[str, Union[int, float]]
 
 router = APIRouter(tags=["parts"])
 
@@ -54,3 +64,26 @@ def delete_part(
     """Remove a part from the shelf."""
     if not manager.remove_part(part_id):
         raise HTTPException(status_code=404, detail=f"Part '{part_id}' not found.")
+
+
+@router.post("/parts/{part_id}/refine", response_model=Dict[str, Any])
+async def refine_part(
+    part_id: str,
+    body: RefineRequest,
+    manager: SessionManager = Depends(get_manager),
+) -> Dict[str, Any]:
+    """Update a part's numeric constraints and restart generation from the Designer.
+
+    Skips ArchitectAgent — reuses the stored DesignPlan with merged constraints.
+    Returns the updated PartEntry immediately; status will be ``"generating"``.
+    Progress is tracked via ``GET /api/events`` SSE stream.
+    """
+    try:
+        await manager.modify_constraints(part_id, dict(body.constraints))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    part = manager.get_part(part_id)
+    if part is None:
+        raise HTTPException(status_code=404, detail=f"Part '{part_id}' not found.")
+    return part.to_dict()

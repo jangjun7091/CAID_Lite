@@ -29,6 +29,7 @@ import { STLLoader } from "three/addons/loaders/STLLoader.js";
 const state = {
   parts: {},          // id → part dict
   activePart: null,   // currently selected part id
+  refinePart: null,   // part id currently open in the Refine modal
 };
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
@@ -63,6 +64,15 @@ const $codeContent     = document.getElementById("code-content");
 const $codeCopyBtn     = document.getElementById("code-copy-btn");
 const $errorPanel      = document.getElementById("error-panel");
 const $errorPanelBody  = document.getElementById("error-panel-body");
+
+// Refine modal
+const $refineModal      = document.getElementById("refine-modal");
+const $refineModalClose = document.getElementById("refine-modal-close");
+const $refineModalTitle = document.getElementById("refine-modal-title");
+const $refineFields     = document.getElementById("refine-fields");
+const $refineApplyBtn   = document.getElementById("refine-apply-btn");
+const $refineCancelBtn  = document.getElementById("refine-cancel-btn");
+const $refineError      = document.getElementById("refine-error");
 
 // ── Three.js — Main Renderer ──────────────────────────────────────────────────
 const renderer = new THREE.WebGLRenderer({ canvas: $canvas, antialias: true });
@@ -174,6 +184,7 @@ document.querySelectorAll(".view-btn[data-view]").forEach(btn => {
 document.addEventListener("keydown", (e) => {
   if (e.target === $chatInput) return;     // don't steal chat shortcuts
   if ($codeModal && !$codeModal.classList.contains("hidden")) return;
+  if ($refineModal && !$refineModal.classList.contains("hidden")) return;
   switch (e.key) {
     case "Home": case "f": case "F":  setView("iso");   break;
     case "1":                         setView("front");  break;
@@ -351,9 +362,120 @@ $codeCopyBtn.addEventListener("click", () => {
   });
 });
 
-// Escape closes modal
+// Escape closes modals
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") closeCodeModal();
+  if (e.key === "Escape") {
+    closeCodeModal();
+    closeRefineModal();
+  }
+});
+
+// ── Refine Modal ──────────────────────────────────────────────────────────────
+function openRefineModal(partId) {
+  const part = state.parts[partId];
+  if (!part || part.status !== "ready" || !part.design_plan) return;
+
+  const constraints = part.design_plan.constraints || {};
+  // numeric 값만 필터링 (load_class 같은 string, rib 같은 boolean 제외)
+  const numericEntries = Object.entries(constraints)
+    .filter(([, v]) => typeof v === "number");
+
+  if (numericEntries.length === 0) {
+    // fallback: chat 입력창에 프롬프트를 복사
+    $chatInput.value = part.prompt;
+    $chatInput.focus();
+    return;
+  }
+
+  state.refinePart = partId;
+  $refineModalTitle.textContent = `Edit Dimensions — ${part.name}`;
+  $refineError.classList.add("hidden");
+  $refineError.textContent = "";
+
+  // 입력 필드 렌더링
+  $refineFields.innerHTML = "";
+  for (const [key, val] of numericEntries) {
+    const unit = key.endsWith("_mm") ? "mm"
+               : key.endsWith("_deg") ? "°"
+               : "";
+    const row = document.createElement("div");
+    row.className = "refine-field-row";
+    row.innerHTML =
+      `<label class="refine-label">${escHtml(key)}</label>` +
+      `<input type="number" class="refine-input" data-key="${escHtml(key)}"` +
+      ` value="${val}" step="${Number.isInteger(val) ? 1 : 0.1}" min="0">` +
+      `<span class="refine-unit">${escHtml(unit)}</span>`;
+    $refineFields.appendChild(row);
+  }
+
+  $refineModal.classList.remove("hidden");
+  // 첫 번째 입력 필드에 포커스
+  const first = $refineFields.querySelector(".refine-input");
+  if (first) first.focus();
+}
+
+function closeRefineModal() {
+  $refineModal.classList.add("hidden");
+  state.refinePart = null;
+}
+
+async function submitRefine() {
+  const partId = state.refinePart;
+  if (!partId) return;
+
+  // 입력값 수집
+  const constraints = {};
+  $refineFields.querySelectorAll(".refine-input").forEach(input => {
+    const key = input.dataset.key;
+    const val = parseFloat(input.value);
+    if (key && !isNaN(val)) constraints[key] = val;
+  });
+
+  $refineApplyBtn.disabled = true;
+  $refineApplyBtn.textContent = "Regenerating…";
+  $refineError.classList.add("hidden");
+
+  try {
+    const res = await fetch(`/api/parts/${partId}/refine`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ constraints }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      $refineError.textContent = err.detail || `Error ${res.status}`;
+      $refineError.classList.remove("hidden");
+      return;
+    }
+
+    const updatedPart = await res.json();
+    state.parts[partId] = updatedPart;
+    closeRefineModal();
+    renderShelf();
+    if (state.activePart === partId) {
+      showPlaceholder("Part is regenerating…");
+    }
+    appendStatusMsg(`"${updatedPart.name}" — refining with updated dimensions`);
+  } catch (err) {
+    $refineError.textContent = `Network error: ${err.message}`;
+    $refineError.classList.remove("hidden");
+  } finally {
+    $refineApplyBtn.disabled = false;
+    $refineApplyBtn.textContent = "Apply & Regenerate";
+  }
+}
+
+// Refine modal event handlers
+$refineModalClose.addEventListener("click", closeRefineModal);
+$refineCancelBtn.addEventListener("click", closeRefineModal);
+$refineApplyBtn.addEventListener("click", submitRefine);
+$refineModal.addEventListener("click", (e) => {
+  if (e.target === $refineModal) closeRefineModal();
+});
+// Enter 키로 제출 (입력 필드 안에서)
+$refineFields.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") { e.preventDefault(); submitRefine(); }
 });
 
 // ── Parts Shelf ───────────────────────────────────────────────────────────────
@@ -390,11 +512,18 @@ function renderShelf() {
 
     li.addEventListener("click", () => selectPart(part.id));
 
-    li.querySelector(".refine-btn").addEventListener("click", (e) => {
-      e.stopPropagation();
-      $chatInput.value = state.parts[part.id]?.prompt ?? "";
-      $chatInput.focus();
-    });
+    const refineBtn = li.querySelector(".refine-btn");
+    if (refineBtn) {
+      if (part.status !== "ready" || !part.design_plan) {
+        refineBtn.classList.add("hidden");   // 생성 중 또는 agents 비활성이면 숨김
+      } else {
+        refineBtn.classList.remove("hidden");
+        refineBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          openRefineModal(part.id);
+        });
+      }
+    }
 
     li.querySelector(".part-name").addEventListener("click", (e) => {
       e.stopPropagation();

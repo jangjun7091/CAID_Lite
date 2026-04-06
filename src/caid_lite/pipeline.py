@@ -516,6 +516,178 @@ class CADPipeline:
         return pipeline_result
 
     # ------------------------------------------------------------------
+    # Dimension-modification entry point (skips ArchitectAgent)
+    # ------------------------------------------------------------------
+
+    def run_with_plan(self, prompt: str, design_plan: Dict[str, Any]) -> PipelineResult:
+        """Re-run the pipeline from the Designer stage using an existing DesignPlan.
+
+        Skips ArchitectAgent to save one LLM call.  Used when the user modifies
+        numeric dimensions via the Refine UI without changing the geometry intent.
+
+        Args:
+            prompt: The original natural-language prompt (used for repair context
+                and dataset logging).
+            design_plan: ``DesignPlan.to_dict()`` dict with updated ``constraints``.
+
+        Returns:
+            ``PipelineResult`` with all fields populated (same as ``run()``).
+
+        Raises:
+            RuntimeError: If ``agents.enabled`` is ``false`` in the config
+                (``PatternSelector`` or ``DesignerAgent`` not available).
+        """
+        if self._pattern_selector is None or self._designer is None:
+            raise RuntimeError(
+                "run_with_plan requires multi-agent mode. "
+                "Set agents.enabled: true in config."
+            )
+
+        run_id = str(uuid.uuid4())
+        start = time.monotonic()
+        _log.info(f"[{run_id[:8]}] run_with_plan started (ArchitectAgent skipped)")
+        _log.debug(f"[{run_id[:8]}] constraints: {design_plan.get('constraints', {})}")
+
+        plan = DesignPlan.from_dict(design_plan)
+        critic_dict: Optional[Dict[str, Any]] = None
+
+        # ── Step 1: PatternSelector + Designer ───────────────────────────
+        try:
+            patterns = self._pattern_selector.select(plan)
+            _log.info(
+                f"[{run_id[:8]}] PatternSelector: {len(patterns)} pattern(s) selected"
+            )
+            _log.info(f"[{run_id[:8]}] Designer: generating code")
+            raw_response = self._designer.generate(prompt, plan, patterns)
+        except Exception as exc:
+            elapsed = time.monotonic() - start
+            error_msg = f"LLM error: {type(exc).__name__}: {exc}"
+            _log.error(f"[{run_id[:8]}] {error_msg}")
+            return PipelineResult(
+                run_id=run_id,
+                success=False,
+                prompt=prompt,
+                generated_code="",
+                elapsed_s=round(elapsed, 3),
+                error=error_msg,
+                design_plan=design_plan,
+            )
+
+        code = self._extract_code(raw_response)
+        _log.debug(f"[{run_id[:8]}] Extracted {len(code)} chars of code")
+
+        # ── Step 1b: Critic review ────────────────────────────────────────
+        if self._critic_enabled and self._critic is not None:
+            try:
+                _log.info(f"[{run_id[:8]}] Critic: reviewing code")
+                critic_result = self._critic.review(prompt, plan, code)
+                critic_dict = critic_result.to_dict()
+                if not critic_result.approved and critic_result.revised_code:
+                    _log.info(
+                        f"[{run_id[:8]}] Critic: code revised "
+                        f"({critic_result.feedback[:80]})"
+                    )
+                    code = critic_result.revised_code
+            except Exception as exc:
+                _log.warning(
+                    f"[{run_id[:8]}] Critic failed ({exc}); proceeding with original code."
+                )
+
+        # ── Step 2: Execute in sandbox ────────────────────────────────────
+        _log.info(f"[{run_id[:8]}] Executing in sandbox")
+        exec_result = self._sandbox.execute(code, run_id=run_id)
+
+        # ── Step 3: Geometry validation ───────────────────────────────────
+        val_result: Optional[ValidationResult] = None
+        if exec_result.success and self._validator:
+            val_result = self._validator.validate(exec_result.validation_metrics)
+            if val_result.valid:
+                _log.info(f"[{run_id[:8]}] Geometry validation passed")
+            else:
+                _log.warning(
+                    f"[{run_id[:8]}] Geometry validation failed: {val_result.errors}"
+                )
+
+        # ── Step 4: Repair loop ───────────────────────────────────────────
+        repair_result: Optional[RepairResult] = None
+        needs_repair = not exec_result.success or (
+            val_result is not None and not val_result.valid
+        )
+
+        if needs_repair and self._repair_loop:
+            if val_result is not None and not val_result.valid:
+                initial_error = val_result.format_errors()
+            else:
+                initial_error = exec_result.exception or "Unknown execution error."
+
+            # Enrich repair prompt with structured plan context
+            repair_prompt = (
+                f"{prompt}\n\n"
+                f"[Structured design plan: "
+                f"geometry_type={design_plan.get('geometry_type', '')}, "
+                f"features={design_plan.get('features', [])}, "
+                f"constraints={design_plan.get('constraints', {})}]"
+            )
+
+            _log.info(f"[{run_id[:8]}] Starting repair loop")
+            repair_result = self._repair_loop.run(
+                repair_prompt, code, initial_error, run_id_prefix=run_id
+            )
+
+            if repair_result.repaired and repair_result.final_exec_result:
+                exec_result = repair_result.final_exec_result
+                code = repair_result.final_code
+                last = repair_result.history[-1]
+                val_result = last.validation
+
+        # ── Step 5: Assemble result ───────────────────────────────────────
+        elapsed = time.monotonic() - start
+
+        final_success = exec_result.success and (
+            val_result is None or val_result.valid
+        )
+
+        if not final_success:
+            if val_result is not None and not val_result.valid:
+                final_error: Optional[str] = val_result.format_errors()
+            else:
+                final_error = exec_result.exception
+        else:
+            final_error = None
+
+        if final_success:
+            _log.info(
+                f"[{run_id[:8]}] run_with_plan succeeded in {elapsed:.2f}s - "
+                f"exports: {list(exec_result.exports.keys())}"
+            )
+        else:
+            _log.warning(f"[{run_id[:8]}] run_with_plan failed in {elapsed:.2f}s")
+
+        pipeline_result = PipelineResult(
+            run_id=run_id,
+            success=final_success,
+            prompt=prompt,
+            generated_code=code,
+            elapsed_s=round(elapsed, 3),
+            execution=exec_result,
+            exports=exec_result.exports,
+            validation=val_result,
+            repair=repair_result.to_dict() if repair_result else None,
+            design_plan=design_plan,   # 수정된 constraints 포함 그대로 반환
+            critic=critic_dict,
+            error=final_error,
+        )
+
+        # ── Step 6: Dataset logging ───────────────────────────────────────
+        if self._dataset_writer is not None:
+            try:
+                self._dataset_writer.write(pipeline_result.to_dict())
+            except Exception as exc:
+                _log.warning(f"[{run_id[:8]}] DatasetWriter failed: {exc}")
+
+        return pipeline_result
+
+    # ------------------------------------------------------------------
     # Code extraction
     # ------------------------------------------------------------------
 
