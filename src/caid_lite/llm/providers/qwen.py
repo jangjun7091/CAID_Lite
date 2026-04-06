@@ -50,15 +50,21 @@ class QwenBackend:
     def generate(self, user_prompt: str, system_prompt: str) -> str:
         """Call the Qwen3-Coder endpoint and return the raw response text."""
         client = self._get_client()
-        response = client.chat.completions.create(
+        kwargs: dict = dict(
             model=self._config.model,
             temperature=self._config.temperature,
             max_tokens=self._config.max_tokens,
+            timeout=self._config.timeout_s,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
         )
+        # Qwen3 models run chain-of-thought by default; disable for faster responses.
+        # Set thinking: true in config/default.yaml to re-enable when quality matters.
+        if not self._config.thinking:
+            kwargs["extra_body"] = {"enable_thinking": False}
+        response = client.chat.completions.create(**kwargs)
         return response.choices[0].message.content or ""
 
     # ------------------------------------------------------------------

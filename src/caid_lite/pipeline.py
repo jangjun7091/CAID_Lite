@@ -181,6 +181,7 @@ class CADPipeline:
         designer: Optional[DesignerAgent] = None,
         critic: Optional[CriticAgent] = None,
         dataset_writer: Optional[DatasetWriter] = None,
+        critic_enabled: bool = True,
     ) -> None:
         self._llm = llm
         self._sandbox = sandbox if sandbox is not None else Sandbox()
@@ -192,6 +193,7 @@ class CADPipeline:
         self._designer = designer
         self._critic = critic
         self._dataset_writer = dataset_writer
+        self._critic_enabled = critic_enabled
 
     # ------------------------------------------------------------------
     # Factory
@@ -255,7 +257,8 @@ class CADPipeline:
 
         # ── Multi-agent setup (default: enabled) ──────────────────────────
         agents_cfg = data.get("agents", {})
-        agents_enabled = agents_cfg.get("enabled", True)  # on by default
+        agents_enabled = agents_cfg.get("enabled", True)   # on by default
+        critic_enabled = agents_cfg.get("critic_enabled", True)
 
         architect = None
         pattern_selector = None
@@ -272,11 +275,14 @@ class CADPipeline:
             pattern_selector = PatternSelector()
             designer = DesignerAgent(llm=llm)
             critic = CriticAgent(llm=llm)
-            _log.info(
-                "Mode         : multi-agent "
-                "(Architect + PatternSelector + Designer + Critic)"
+            mode_detail = (
+                "Architect + PatternSelector + Designer + Critic"
+                if critic_enabled
+                else "Architect + PatternSelector + Designer (Critic disabled)"
             )
+            _log.info(f"Mode         : multi-agent ({mode_detail})")
         else:
+            critic_enabled = False
             _log.info("Mode         : single-LLM (agents.enabled=false)")
 
         log_dir = Path(
@@ -294,6 +300,7 @@ class CADPipeline:
             designer=designer,
             critic=critic,
             dataset_writer=dataset_writer,
+            critic_enabled=critic_enabled,
         )
 
     # ------------------------------------------------------------------
@@ -379,7 +386,7 @@ class CADPipeline:
         _log.debug(f"[{run_id[:8]}] Extracted {len(code)} chars of code")
 
         # ── Step 1d (multi-agent): Critic review ──────────────────────────
-        if multi_agent:
+        if multi_agent and self._critic_enabled:
             try:
                 _log.info(f"[{run_id[:8]}] Critic: reviewing code")
                 critic_result = self._critic.review(prompt, plan, code)  # type: ignore[union-attr]

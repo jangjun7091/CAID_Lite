@@ -49,6 +49,7 @@ class LocalBackend:
             model=self._config.model,
             temperature=self._config.temperature,
             max_tokens=self._config.max_tokens,
+            timeout=self._config.timeout_s,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},

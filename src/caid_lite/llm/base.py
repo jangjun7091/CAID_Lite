@@ -53,6 +53,8 @@ class LLMConfig:
     api_base: Optional[str] = None
     temperature: float = 0.2
     max_tokens: int = 4096
+    timeout_s: float = 120.0  # per-request HTTP timeout; prevents 5-min gateway hangs
+    thinking: bool = False     # Qwen3 thinking mode; False = direct answer (much faster)
 
     @classmethod
     def from_dict(cls, data: dict) -> "LLMConfig":
@@ -67,6 +69,8 @@ class LLMConfig:
             model=data["model"],
             temperature=data.get("temperature", 0.2),
             max_tokens=data.get("max_tokens", 4096),
+            timeout_s=float(data.get("timeout_s", 120.0)),
+            thinking=bool(data.get("thinking", False)),
         )
 
     def with_env_overrides(self) -> "LLMConfig":
@@ -78,4 +82,6 @@ class LLMConfig:
             api_base=self.api_base,
             temperature=self.temperature,
             max_tokens=self.max_tokens,
+            timeout_s=self.timeout_s,
+            thinking=self.thinking,
         )
