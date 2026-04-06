@@ -40,7 +40,9 @@
       "Bash(git commit:*)",
       "Bash(git push:*)",
       "Bash(python -m pytest tests/unit/test_validator.py -q)",
-      "Bash(python -m pytest tests/unit/test_dataset.py tests/unit/test_error_classify.py -q)"
+      "Bash(python -m pytest tests/unit/test_dataset.py tests/unit/test_error_classify.py -q)",
+      "Bash(python -c \"import yaml; yaml.safe_load\\(open\\(''''config/patterns/mug.yaml''''\\).read\\(\\)\\)\")",
+      "Bash(python -c \"import yaml; yaml.safe_load\\(open\\(''''config/patterns/power_strip.yaml''''\\).read\\(\\)\\)\")"
     ]
   }
 }

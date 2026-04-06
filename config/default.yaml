@@ -2,7 +2,7 @@ llm:
   # Provider: qwen | openai | anthropic | local
   # Override at runtime with env vars: LLM_PROVIDER, LLM_MODEL
   provider: "qwen"
-  model: "qwen3-coder-30b-a3b-instruct"
+  model: "qwen3.5-27b"
   temperature: 0.2
   max_tokens: 4096
   # Per-request HTTP timeout (seconds). Prevents hanging when the API gateway
@@ -18,7 +18,7 @@ agents:
   enabled: true
   # Run Critic after Designer. Critic adds one extra LLM call per request.
   # Set true to enable code review; false for faster generation.
-  critic_enabled: false
+  critic_enabled: true
 
 executor:
   timeout_s: 60
