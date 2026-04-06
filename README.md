@@ -38,7 +38,7 @@
 | **지오메트리 검증** | isValid, 부피, 솔리드 여부 등 하드/소프트 체크 |
 | **자동 수정 루프** | 실행·검증 실패 시 LLM 유도 수정 최대 3회 반복 |
 | **멀티에이전트 파이프라인** | Architect → Designer → Critic 4단계 생성 구조 (옵션) |
-| **CAD 패턴 라이브러리** | 20종 YAML 패턴으로 생성 품질 향상 |
+| **CAD 패턴 라이브러리** | 21종 YAML 패턴으로 생성 품질 향상 |
 | **3-pane 브라우저 GUI** | Parts Shelf / Three.js 3D 뷰어 / AI 채팅 |
 | **FastAPI REST + SSE** | 실시간 상태 스트리밍, STEP/STL 다운로드 |
 | **JSONL 데이터셋 로그** | 파인튜닝 및 벤치마크용 실행 기록 자동 수집 |
@@ -110,7 +110,7 @@ PipelineResult
 CAID_Lite/
 ├── config/
 │   ├── default.yaml              # LLM, executor, repair, logging 설정
-│   ├── patterns/                 # CAD 패턴 라이브러리 (20종 YAML)
+│   ├── patterns/                 # CAD 패턴 라이브러리 (21종 YAML)
 │   │   ├── README.md
 │   │   ├── plate.yaml
 │   │   ├── box.yaml
@@ -389,7 +389,7 @@ print(result.critic)        # Critic 평가 결과
 
 ## CAD 패턴 라이브러리
 
-`config/patterns/` 에 20종의 YAML 패턴 파일이 포함되어 있습니다.
+`config/patterns/` 에 21종의 YAML 패턴 파일이 포함되어 있습니다.
 각 파일은 선호 CadQuery 관용구, 안티패턴, 파라미터, 예제 코드, 수정 힌트를 담고 있습니다.
 
 ### 솔리드 프리미티브
@@ -431,6 +431,7 @@ print(result.critic)        # Critic 평가 결과
 | `spacer` | 패스너 클리어런스 보어가 있는 단거리 스탠드오프 |
 | `shaft_support` | 샤프트 정렬·지지용 보스가 있는 베이스 플레이트 |
 | `connector_block` | 커넥터 포켓 + 마운팅 홀 블록 |
+| `heat_sink` | 방열 핀 배열이 있는 알루미늄 히트싱크 베이스 |
 
 ---
 

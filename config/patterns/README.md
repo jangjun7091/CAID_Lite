@@ -12,17 +12,16 @@ config/patterns/
   README.md             -- this file
 ```
 
-## Intended future use
+## How patterns are used
 
-Pattern files are not yet wired into the pipeline.  Planned uses:
+Pattern files are selected by `PatternSelector` (keyword-based, no LLM call)
+and injected into the `DesignerAgent` generation prompt — up to 3 patterns
+per request, ranked by keyword overlap with the `DesignPlan`.
 
-- **Prompt injection**: `PromptBuilder` selects the 1-2 most relevant
-  patterns based on the user prompt and appends their `idiom`, `avoid`,
-  and `example` sections to the generation system prompt.
+Additional planned use:
+
 - **Repair guidance**: `RepairLoop` matches executor error strings against
   `repair_hints` in candidate patterns to produce a targeted repair prompt.
-- **Pattern classification**: a lightweight classifier maps a user prompt to
-  a primary pattern + optional feature patterns before generation begins.
 
 ## YAML schema
 
@@ -81,6 +80,7 @@ repair_hints: list of actionable repair strings
 | spacer.yaml | Short cylindrical standoff with fastener clearance bore |
 | shaft_support.yaml | Base plate with boss for radial shaft alignment and support |
 | connector_block.yaml | Block with connector pocket and mounting holes |
+| heat_sink.yaml | Heat sink base with parallel fin array (rarray-based) |
 
 ## Conventions
 
