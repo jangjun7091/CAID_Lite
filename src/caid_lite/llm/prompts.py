@@ -148,6 +148,17 @@ class PromptBuilder:
             "  - Volume must be > 0: ensure the model is fully extruded\n"
             "  - Boolean ops (.hole(), .cut()) on an existing solid are valid and produce cq.Compound"
         ),
+        "INT_CAST_ERROR": (
+            "TARGETED FIX (INT_CAST_ERROR): "
+            "rarray() received a float where an integer is required.\n"
+            "Fix the ARGUMENT ORDER: rarray(xSpacing, ySpacing, xCount, yCount)\n"
+            "  - xSpacing, ySpacing = float  (gap between element centres, e.g. fin_spacing)\n"
+            "  - xCount,  yCount   = int    (number of elements, e.g. n_fins)\n"
+            "Fins along X axis → .rarray(fin_spacing, 0,           n_fins, 1     )\n"
+            "Fins along Y axis → .rarray(0,           fin_spacing, 1,      n_fins)\n"
+            "WRONG example:       .rarray(1, 0, n_fins, fin_spacing)  ← fin_spacing in yCount!\n"
+            "Also cast: n_fins = int(n_fins)  before calling rarray."
+        ),
     }
 
     def build_repair_prompt(

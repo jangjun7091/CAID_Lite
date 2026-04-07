@@ -182,9 +182,24 @@ class SessionManager:
                 "Refine requires multi-agent mode (agents.enabled: true in config)."
             )
 
-        # Merge new constraints into a deep copy of the stored plan
+        # Merge new constraints into a deep copy of the stored plan.
+        # Type-preserving: if the original constraint was int and the incoming
+        # value is a whole-number float (e.g. 16.0 from some serialisation path),
+        # restore it to int so the Designer prompt shows "n_fins=16" not "n_fins=16.0".
         updated_plan = copy.deepcopy(part.design_plan)
-        updated_plan.setdefault("constraints", {}).update(constraints)
+        orig_constraints = part.design_plan.get("constraints", {})
+        type_safe: Dict[str, Any] = {}
+        for key, new_val in constraints.items():
+            orig_val = orig_constraints.get(key)
+            if (
+                isinstance(orig_val, int)
+                and isinstance(new_val, float)
+                and new_val.is_integer()
+            ):
+                type_safe[key] = int(new_val)
+            else:
+                type_safe[key] = new_val
+        updated_plan.setdefault("constraints", {}).update(type_safe)
 
         # Reset part state for re-generation
         part.status = "generating"

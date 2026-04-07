@@ -29,6 +29,7 @@ ERROR_SYNTAX                = "SYNTAX_ERROR"
 ERROR_IMPORT                = "IMPORT_ERROR"
 ERROR_VALIDATION_FAILURE    = "VALIDATION_FAILURE"
 ERROR_UNIT                  = "UNIT_ERROR"
+ERROR_INT_CAST              = "INT_CAST_ERROR"
 ERROR_UNKNOWN               = "UNKNOWN"
 
 
@@ -112,6 +113,14 @@ def classify_error(error: str) -> str:
         "face_count", "validation",
     )):
         return ERROR_VALIDATION_FAILURE
+
+    # rarray int/float argument order error
+    if "cannot be interpreted as an integer" in lower or (
+        "typeerror" in lower
+        and "float" in lower
+        and any(kw in lower for kw in ("int", "rarray", "range"))
+    ):
+        return ERROR_INT_CAST
 
     return ERROR_UNKNOWN
 
