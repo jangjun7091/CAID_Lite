@@ -30,6 +30,9 @@ const state = {
   parts: {},          // id → part dict
   activePart: null,   // currently selected part id
   refinePart: null,   // part id currently open in the Refine modal
+  catalog: null,              // catalog data from GET /api/catalog
+  catalogCat: "fastener",     // currently selected category tab
+  catalogSelectedType: null,  // currently selected part type id (e.g. "iso4762")
 };
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
@@ -64,6 +67,22 @@ const $codeContent     = document.getElementById("code-content");
 const $codeCopyBtn     = document.getElementById("code-copy-btn");
 const $errorPanel      = document.getElementById("error-panel");
 const $errorPanelBody  = document.getElementById("error-panel-body");
+
+// Catalog modal
+const $catalogModal       = document.getElementById("catalog-modal");
+const $catalogModalClose  = document.getElementById("catalog-modal-close");
+const $catalogCatBtns     = document.querySelectorAll(".cat-btn");
+const $catalogGrid        = document.getElementById("catalog-grid");
+const $catalogConfigEmpty = document.getElementById("catalog-config-empty");
+const $catalogConfigPanel = document.getElementById("catalog-config-panel");
+const $configPartName     = document.getElementById("config-part-name");
+const $catSizeSel         = document.getElementById("cat-size-sel");
+const $catLengthRow       = document.getElementById("cat-length-row");
+const $catLengthInp       = document.getElementById("cat-length-inp");
+const $catDimsTable       = document.getElementById("cat-dims-table");
+const $catalogInsertBtn   = document.getElementById("catalog-insert-btn");
+const $catalogError       = document.getElementById("catalog-error");
+const $catalogOpenBtn     = document.getElementById("catalog-open-btn");
 
 // Refine modal
 const $refineModal      = document.getElementById("refine-modal");
@@ -185,6 +204,7 @@ document.addEventListener("keydown", (e) => {
   if (e.target === $chatInput) return;     // don't steal chat shortcuts
   if ($codeModal && !$codeModal.classList.contains("hidden")) return;
   if ($refineModal && !$refineModal.classList.contains("hidden")) return;
+  if ($catalogModal && !$catalogModal.classList.contains("hidden")) return;
   switch (e.key) {
     case "Home": case "f": case "F":  setView("iso");   break;
     case "1":                         setView("front");  break;
@@ -369,6 +389,300 @@ document.addEventListener("keydown", (e) => {
     closeRefineModal();
   }
 });
+
+// ── Catalog Modal ─────────────────────────────────────────────────────────────
+
+// SVG icons for each part type (40×40 or similar viewBox, stroke-based line art)
+const PART_ICONS = {
+  // ── Fasteners ────────────────────────────────────────────────────────────
+  iso4762: `<svg viewBox="0 0 32 60" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="8" y="2" width="16" height="12" rx="1.5"/>
+    <polygon points="16,5.5 20,8 20,10 16,12.5 12,10 12,8" stroke-width="1.2"/>
+    <rect x="13" y="14" width="6" height="42" rx="1"/>
+  </svg>`,
+
+  iso7380: `<svg viewBox="0 0 32 60" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M8,14 Q8,2 16,2 Q24,2 24,14 Z"/>
+    <rect x="13" y="14" width="6" height="42" rx="1"/>
+  </svg>`,
+
+  iso10642: `<svg viewBox="0 0 32 60" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M8,16 L16,2 L24,16 Z"/>
+    <line x1="8" y1="16" x2="24" y2="16"/>
+    <rect x="13" y="16" width="6" height="40" rx="1"/>
+  </svg>`,
+
+  iso4026: `<svg viewBox="0 0 32 44" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="10" y="2" width="12" height="40" rx="3"/>
+    <polygon points="16,5.5 19.5,8 19.5,11 16,13.5 12.5,11 12.5,8" stroke-width="1.2"/>
+  </svg>`,
+
+  iso4032: `<svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round">
+    <polygon points="20,3 34,11 34,29 20,37 6,29 6,11"/>
+    <circle cx="20" cy="20" r="8"/>
+  </svg>`,
+
+  iso7089: `<svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="1.8">
+    <circle cx="20" cy="20" r="17"/>
+    <circle cx="20" cy="20" r="8.5"/>
+  </svg>`,
+
+  // ── Bearings ─────────────────────────────────────────────────────────────
+  iso15_6000: `<svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="1.8">
+    <circle cx="20" cy="20" r="18"/>
+    <circle cx="20" cy="20" r="12" stroke-width="1"/>
+    <circle cx="20" cy="20" r="7"/>
+    <circle cx="20" cy="8"  r="2.4" fill="currentColor" opacity="0.55" stroke="none"/>
+    <circle cx="29" cy="13" r="2.4" fill="currentColor" opacity="0.55" stroke="none"/>
+    <circle cx="29" cy="27" r="2.4" fill="currentColor" opacity="0.55" stroke="none"/>
+    <circle cx="20" cy="32" r="2.4" fill="currentColor" opacity="0.55" stroke="none"/>
+    <circle cx="11" cy="27" r="2.4" fill="currentColor" opacity="0.55" stroke="none"/>
+    <circle cx="11" cy="13" r="2.4" fill="currentColor" opacity="0.55" stroke="none"/>
+  </svg>`,
+
+  iso15_6200: `<svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="1.8">
+    <circle cx="20" cy="20" r="18"/>
+    <circle cx="20" cy="20" r="11" stroke-width="1"/>
+    <circle cx="20" cy="20" r="5"/>
+    <circle cx="20" cy="9"  r="2.2" fill="currentColor" opacity="0.55" stroke="none"/>
+    <circle cx="29.5" cy="14.5" r="2.2" fill="currentColor" opacity="0.55" stroke="none"/>
+    <circle cx="29.5" cy="25.5" r="2.2" fill="currentColor" opacity="0.55" stroke="none"/>
+    <circle cx="20" cy="31" r="2.2" fill="currentColor" opacity="0.55" stroke="none"/>
+    <circle cx="10.5" cy="25.5" r="2.2" fill="currentColor" opacity="0.55" stroke="none"/>
+    <circle cx="10.5" cy="14.5" r="2.2" fill="currentColor" opacity="0.55" stroke="none"/>
+  </svg>`,
+
+  // ── Shaft & Keys ─────────────────────────────────────────────────────────
+  shaft_h6: `<svg viewBox="0 0 60 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+    <rect x="2" y="4" width="56" height="12" rx="6"/>
+  </svg>`,
+
+  din705: `<svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="1.8">
+    <circle cx="20" cy="20" r="17"/>
+    <circle cx="20" cy="20" r="9"/>
+    <rect x="18" y="2" width="4" height="7" rx="1" fill="currentColor" opacity="0.5" stroke="currentColor" stroke-width="1.2"/>
+  </svg>`,
+
+  din6885: `<svg viewBox="0 0 58 22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+    <rect x="3" y="3" width="52" height="16" rx="8"/>
+    <line x1="11" y1="3" x2="11" y2="19" stroke-width="0.9" opacity="0.4"/>
+    <line x1="47" y1="3" x2="47" y2="19" stroke-width="0.9" opacity="0.4"/>
+  </svg>`,
+
+  // ── Profiles ─────────────────────────────────────────────────────────────
+  tslot: `<svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round">
+    <path d="M4,4 L15,4 L15,8 L12,8 L12,14 L28,14 L28,8 L25,8 L25,4
+             L36,4 L36,15 L32,15 L32,12 L26,12 L26,28 L32,28 L32,25 L36,25
+             L36,36 L25,36 L25,32 L28,32 L28,26 L12,26 L12,32 L15,32 L15,36
+             L4,36 L4,25 L8,25 L8,28 L14,28 L14,12 L8,12 L8,15 L4,15 Z"/>
+    <circle cx="20" cy="20" r="3.5"/>
+  </svg>`,
+};
+
+// Human-readable dimension labels
+const DIM_LABELS = {
+  d: "Ø Shank / Bore (d)", dk: "Ø Head (dk)", k: "Head Height (k)",
+  s: "Socket / Key (s)", m: "Nut Height (m)", d1: "Ø Inner (d1)",
+  d2: "Ø Outer (d2)", t: "Thickness (t)", pitch: "Thread Pitch",
+  D: "Ø Outer (D)", B: "Width (B)", b: "Key Width (b)", h: "Key Height (h)",
+  w: "Section (w)", slot_w: "Slot Opening", slot_d: "Slot Depth",
+  center_d: "Center Bore",
+};
+
+async function initCatalog() {
+  try {
+    const r = await fetch("/api/catalog");
+    state.catalog = await r.json();
+  } catch (err) {
+    console.warn("Failed to load catalog:", err);
+  }
+}
+
+function openCatalogModal() {
+  if (!state.catalog) return;
+  $catalogError.classList.add("hidden");
+  renderCatalogCategory(state.catalogCat);
+  $catalogModal.classList.remove("hidden");
+}
+
+function closeCatalogModal() {
+  $catalogModal.classList.add("hidden");
+}
+
+function renderCatalogCategory(cat) {
+  state.catalogCat = cat;
+
+  // Update active tab
+  $catalogCatBtns.forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.cat === cat);
+  });
+
+  // Render icon grid
+  const types = state.catalog[cat] || [];
+  $catalogGrid.innerHTML = types.map(t => {
+    const icon = PART_ICONS[t.id] || `<svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="16" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>`;
+    const isSelected = t.id === state.catalogSelectedType;
+    return `<div class="cat-card${isSelected ? " selected" : ""}" data-type="${escHtml(t.id)}" title="${escHtml(t.name)}">
+      <div class="cat-card-icon">${icon}</div>
+      <div class="cat-card-label">${escHtml(_shortName(t.name))}</div>
+    </div>`;
+  }).join("");
+
+  // Attach click handlers
+  $catalogGrid.querySelectorAll(".cat-card").forEach(card => {
+    card.addEventListener("click", () => selectCatalogPart(card.dataset.type));
+  });
+
+  // If previously selected part is in this category, re-select it; else deselect
+  const inCategory = types.some(t => t.id === state.catalogSelectedType);
+  if (!inCategory) {
+    state.catalogSelectedType = null;
+    $catalogConfigEmpty.classList.remove("hidden");
+    $catalogConfigPanel.classList.add("hidden");
+  } else if (state.catalogSelectedType) {
+    _showConfigPanel(state.catalogSelectedType);
+  }
+}
+
+function selectCatalogPart(typeId) {
+  state.catalogSelectedType = typeId;
+
+  // Highlight selected card
+  $catalogGrid.querySelectorAll(".cat-card").forEach(card => {
+    card.classList.toggle("selected", card.dataset.type === typeId);
+  });
+
+  _showConfigPanel(typeId);
+}
+
+function _shortName(name) {
+  // "ISO 4762 Socket Head Cap Screw" → "Socket Head\nCap Screw"
+  // Keep under ~20 chars by taking last 2-3 words
+  const words = name.split(" ");
+  if (words.length <= 3) return name;
+  // Drop leading standard prefix (ISO XXXX / DIN XXX)
+  const idx = words.findIndex(w => !/^(ISO|DIN|Ball|Set|Plain|T-Slot|Shaft)$/i.test(w));
+  return words.slice(Math.max(idx, 1)).join(" ");
+}
+
+function _showConfigPanel(typeId) {
+  const cat = state.catalogCat;
+  const types = state.catalog[cat] || [];
+  const type = types.find(t => t.id === typeId);
+  if (!type) return;
+
+  $configPartName.textContent = type.name;
+
+  // Size selector
+  $catSizeSel.innerHTML = type.sizes
+    .map(s => `<option value="${escHtml(s)}">${escHtml(s)}</option>`)
+    .join("");
+
+  // Length input
+  if (type.has_length) {
+    $catLengthRow.classList.remove("hidden");
+    const defaults = type.default_lengths || [];
+    const mid = defaults[Math.floor(defaults.length / 2)] || 20;
+    $catLengthInp.value = mid;
+  } else {
+    $catLengthRow.classList.add("hidden");
+  }
+
+  // Dimension table for first size
+  if (type.sizes.length > 0) {
+    renderCatalogDims(typeId, type.sizes[0]);
+  }
+
+  $catalogConfigEmpty.classList.add("hidden");
+  $catalogConfigPanel.classList.remove("hidden");
+}
+
+function renderCatalogDims(typeId, size) {
+  const cat = state.catalogCat;
+  const types = state.catalog[cat] || [];
+  const type = types.find(t => t.id === typeId);
+  if (!type) return;
+
+  const dims = (type.dims || {})[size];
+  if (!dims) { $catDimsTable.innerHTML = ""; return; }
+
+  const rows = Object.entries(dims)
+    .map(([k, v]) => `<tr><td class="dim-key">${escHtml(DIM_LABELS[k] || k)}</td><td class="dim-val">${v} mm</td></tr>`)
+    .join("");
+
+  $catDimsTable.innerHTML = `
+    <thead><tr><th>Dimension</th><th>Value</th></tr></thead>
+    <tbody>${rows}</tbody>`;
+}
+
+async function submitCatalogInsert() {
+  const typeId = state.catalogSelectedType;
+  if (!typeId) return;
+
+  const cat = state.catalogCat;
+  const types = state.catalog[cat] || [];
+  const type = types.find(t => t.id === typeId);
+  if (!type) return;
+
+  const body = { type: typeId, size: $catSizeSel.value };
+  if (type.has_length) {
+    const len = parseFloat($catLengthInp.value);
+    if (!len || len <= 0) {
+      $catalogError.textContent = "Please enter a valid length (mm).";
+      $catalogError.classList.remove("hidden");
+      return;
+    }
+    body.length = len;
+  }
+
+  $catalogInsertBtn.disabled = true;
+  $catalogInsertBtn.textContent = "Inserting…";
+  $catalogError.classList.add("hidden");
+
+  try {
+    const res = await fetch("/api/catalog/insert", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      $catalogError.textContent = err.detail || `Error ${res.status}`;
+      $catalogError.classList.remove("hidden");
+      return;
+    }
+
+    const part = await res.json();
+    state.parts[part.id] = part;
+    renderShelf();
+    if (!state.activePart) {
+      state.activePart = part.id;
+      renderShelf();
+      showPlaceholder("Part is generating…");
+    }
+    appendStatusMsg(`Inserting "${part.name}"…`);
+    closeCatalogModal();
+  } catch (err) {
+    $catalogError.textContent = `Network error: ${err.message}`;
+    $catalogError.classList.remove("hidden");
+  } finally {
+    $catalogInsertBtn.disabled = false;
+    $catalogInsertBtn.textContent = "Insert Part";
+  }
+}
+
+// Catalog event handlers
+$catalogOpenBtn.addEventListener("click", openCatalogModal);
+$catalogModalClose.addEventListener("click", closeCatalogModal);
+$catalogModal.addEventListener("click", (e) => {
+  if (e.target === $catalogModal) closeCatalogModal();
+});
+$catalogCatBtns.forEach(btn => {
+  btn.addEventListener("click", () => renderCatalogCategory(btn.dataset.cat));
+});
+$catSizeSel.addEventListener("change", () => renderCatalogDims(state.catalogSelectedType, $catSizeSel.value));
+$catalogInsertBtn.addEventListener("click", submitCatalogInsert);
 
 // ── Refine Modal ──────────────────────────────────────────────────────────────
 function openRefineModal(partId) {
@@ -786,3 +1100,4 @@ function escHtml(str) {
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
 connectSSE();
+initCatalog();

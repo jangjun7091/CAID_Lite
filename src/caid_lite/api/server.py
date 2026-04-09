@@ -25,7 +25,7 @@ from starlette.requests import Request as StarletteRequest
 
 from ..pipeline import CADPipeline
 from ..session.manager import SessionManager
-from .routes import chat, events, parts, workspace
+from .routes import catalog, chat, events, parts, workspace
 
 # Resolve GUI static directory relative to this file (works whether installed
 # or run in-place from the project root).
@@ -88,6 +88,7 @@ def create_app(config_path: str | Path = "config/default.yaml") -> FastAPI:
     app.include_router(parts.router, prefix="/api")
     app.include_router(workspace.router, prefix="/api")
     app.include_router(events.router, prefix="/api")
+    app.include_router(catalog.router, prefix="/api")
 
     # Serve the GUI static files.  Mount last so API routes take priority.
     if _STATIC_DIR.is_dir():

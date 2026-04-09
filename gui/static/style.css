@@ -501,3 +501,204 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
 .refine-apply:disabled { opacity: .4; cursor: not-allowed; }
 
 .refine-btn.hidden { display: none; }
+
+/* ── Parts Library Button (chat header) ──────────────────────────────────── */
+.chat-header {
+  display: flex; align-items: center; justify-content: space-between;
+}
+#catalog-open-btn {
+  background: transparent; border: 1px solid var(--border);
+  color: var(--text-dim); font-size: 10px; font-weight: 600;
+  padding: 3px 8px; border-radius: 4px; cursor: pointer;
+  transition: background .12s, color .12s, border-color .12s;
+  white-space: nowrap; font-family: var(--font);
+}
+#catalog-open-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+/* ── Catalog Modal ────────────────────────────────────────────────────────── */
+#catalog-modal {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(0,0,0,.72);
+  display: flex; align-items: center; justify-content: center;
+  backdrop-filter: blur(3px);
+}
+#catalog-modal.hidden { display: none; }
+
+#catalog-modal-panel {
+  width: min(800px, 96vw);
+  max-height: 88vh;
+  display: flex; flex-direction: column;
+  background: #161b27;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 24px 60px rgba(0,0,0,.6);
+}
+
+#catalog-modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  flex-shrink: 0;
+}
+#catalog-modal-title { font-size: 13px; font-weight: 600; color: var(--text); }
+
+/* Category tab bar */
+#catalog-tabs {
+  display: flex; gap: 2px;
+  padding: 10px 16px 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  flex-shrink: 0;
+}
+
+.cat-btn {
+  background: transparent; border: none;
+  color: var(--text-dim); font-size: 12px; font-weight: 600;
+  padding: 6px 14px; border-radius: 4px 4px 0 0; cursor: pointer;
+  font-family: var(--font);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color .12s;
+}
+.cat-btn:hover { color: var(--text); }
+.cat-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* 2-column body */
+#catalog-modal-body {
+  display: flex; flex-direction: row;
+  flex: 1; min-height: 420px; overflow: hidden;
+}
+
+/* Left: icon grid pane */
+#catalog-grid-pane {
+  width: 280px; flex-shrink: 0;
+  overflow-y: auto;
+  border-right: 1px solid var(--border);
+  padding: 10px;
+}
+
+#catalog-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.cat-card {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 5px; padding: 8px 4px;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background .12s, border-color .12s;
+}
+.cat-card:hover {
+  background: var(--surface2);
+  border-color: var(--border);
+}
+.cat-card.selected {
+  background: rgba(91,138,245,.12);
+  border-color: var(--accent);
+}
+
+.cat-card-icon {
+  width: 52px; height: 52px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+.cat-card-icon svg { width: 100%; height: 100%; }
+.cat-card:hover .cat-card-icon,
+.cat-card.selected .cat-card-icon { color: var(--text); }
+
+.cat-card-label {
+  font-size: 10px; font-weight: 600; color: var(--text-dim);
+  text-align: center; line-height: 1.3;
+  word-break: break-word; hyphens: auto;
+}
+.cat-card.selected .cat-card-label { color: var(--accent); }
+
+/* Right: config pane */
+#catalog-config-pane {
+  flex: 1; overflow-y: auto;
+  padding: 16px;
+  display: flex; flex-direction: column;
+}
+
+#catalog-config-empty {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 10px; color: var(--text-dim);
+  font-size: 12px;
+}
+#catalog-config-empty svg {
+  width: 48px; height: 48px;
+  stroke: var(--text-dim); opacity: .5;
+}
+
+#catalog-config-panel {
+  display: flex; flex-direction: column; gap: 14px;
+}
+#catalog-config-empty.hidden { display: none; }
+#catalog-config-panel.hidden { display: none; }
+
+#config-part-name {
+  font-size: 14px; font-weight: 700; color: var(--text);
+}
+
+#catalog-config-fields {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+}
+#cat-length-row { grid-column: 1 / -1; }
+#cat-length-row.hidden { display: none; }
+
+.cat-label {
+  display: flex; flex-direction: column; gap: 4px;
+}
+.cat-label-text {
+  font-size: 11px; font-weight: 600; color: var(--text-dim);
+  text-transform: uppercase; letter-spacing: .05em;
+}
+.cat-label select,
+.cat-label input {
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--radius); color: var(--text);
+  font-size: 13px; font-family: var(--font);
+  padding: 6px 8px; outline: none; width: 100%;
+  transition: border-color .15s;
+}
+.cat-label select:focus,
+.cat-label input:focus { border-color: var(--accent); }
+
+/* Dimension table */
+#cat-dims-table {
+  width: 100%; border-collapse: collapse;
+  font-size: 12px; font-family: var(--font-mono);
+}
+#cat-dims-table thead tr { border-bottom: 1px solid var(--border); }
+#cat-dims-table th {
+  text-align: left; padding: 5px 8px;
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--text-dim);
+}
+#cat-dims-table tbody tr:nth-child(even) { background: rgba(255,255,255,.02); }
+.dim-key { padding: 4px 8px; color: var(--text-dim); }
+.dim-val { padding: 4px 8px; color: var(--text); font-weight: 500; text-align: right; }
+
+/* Footer */
+#catalog-footer {
+  display: flex; align-items: center; justify-content: flex-end; gap: 10px;
+  padding-top: 4px; margin-top: auto;
+}
+.catalog-error { font-size: 12px; color: var(--red); flex: 1; }
+.catalog-error.hidden { display: none; }
+
+#catalog-insert-btn {
+  background: var(--accent); border: none; color: #fff;
+  font-size: 13px; font-weight: 600; font-family: var(--font);
+  padding: 7px 20px; border-radius: var(--radius); cursor: pointer;
+  transition: filter .12s, opacity .12s;
+}
+#catalog-insert-btn:hover:not(:disabled) { filter: brightness(1.12); }
+#catalog-insert-btn:disabled { opacity: .4; cursor: not-allowed; }

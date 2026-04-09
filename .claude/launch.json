@@ -4,8 +4,8 @@
     {
       "name": "CAID Lite GUI",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["gui/app.py"],
-      "port": 8000
+      "runtimeArgs": ["gui/app.py", "--port", "9001", "--no-browser"],
+      "port": 9001
     },
     {
       "name": "CAID Lite API (dev reload)",

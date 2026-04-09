@@ -217,6 +217,77 @@ class SessionManager:
         return part_id
 
     # ------------------------------------------------------------------
+    # Standard catalog parts (no LLM)
+    # ------------------------------------------------------------------
+
+    async def insert_catalog_part(
+        self,
+        part_type: str,
+        size: str,
+        length: float | None = None,
+    ) -> str:
+        """Instantiate a standard catalog part without calling the LLM.
+
+        Looks up the ISO dimension table, generates deterministic CadQuery
+        code, and runs it directly in the sandbox.  Emits the same SSE
+        events as a normal generation run so the GUI updates identically.
+
+        Args:
+            part_type: Catalog key, e.g. ``"iso4762"``.
+            size:      Size label, e.g. ``"M6"``.
+            length:    Required length in mm for bolts/screws; None for
+                       nuts and washers.
+
+        Returns:
+            The UUID string of the newly created ``PartEntry``.
+
+        Raises:
+            ValueError: Unknown part type, unknown size, or missing length.
+        """
+        from ..catalog.builder import generate_code
+
+        code, display_name = generate_code(part_type, size, length)
+
+        part_id = str(uuid.uuid4())
+        part = PartEntry(
+            id=part_id,
+            name=display_name,
+            prompt=display_name,
+            status="generating",
+            created_at=datetime.now(timezone.utc),
+        )
+        self._state.add_part(part)
+        self.emit("part.status_changed", {"id": part_id, "status": "generating"})
+
+        asyncio.create_task(self._run_catalog(part, code))
+        return part_id
+
+    async def _run_catalog(self, part: PartEntry, code: str) -> None:
+        """Background task: run catalog code directly in the sandbox (no LLM)."""
+        try:
+            result = await asyncio.to_thread(
+                self._pipeline._sandbox.execute, code, part.id
+            )
+        except Exception as exc:
+            _log.error(f"[{part.id[:8]}] Catalog sandbox exception: {exc}")
+            part.error = str(exc)
+            part.status = "failed"
+            self.emit("part.failed", part.to_dict())
+            return
+
+        part.code = code
+        if result.success:
+            part.exports = {k: str(v) for k, v in result.exports.items()}
+            part.status = "ready"
+            self.emit("part.ready", part.to_dict())
+            _log.info(f"[{part.id[:8]}] Catalog part ready — {part.name}")
+        else:
+            part.error = result.exception or "Execution failed"
+            part.status = "failed"
+            self.emit("part.failed", part.to_dict())
+            _log.warning(f"[{part.id[:8]}] Catalog part failed — {part.error}")
+
+    # ------------------------------------------------------------------
     # Generation dispatch
     # ------------------------------------------------------------------
 

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CAID Lite</title>
-  <link rel="stylesheet" href="style.css?v=4">
+  <link rel="stylesheet" href="style.css?v=5">
   <!-- highlight.js — Python syntax colouring for code modal -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github-dark.min.css">
   <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/highlight.min.js"></script>
@@ -106,6 +106,7 @@
     <aside id="chat-panel">
       <div class="chat-header">
         <h2>Chat</h2>
+        <button id="catalog-open-btn" title="Standard Parts Library">Parts Library</button>
       </div>
       <div id="chat-messages"></div>
       <form id="chat-form">
@@ -121,6 +122,63 @@
     </aside>
 
   </main>
+
+  <!-- ── Catalog Modal ─────────────────────────────────────────────────────── -->
+  <div id="catalog-modal" class="hidden" role="dialog" aria-modal="true" aria-label="Standard Parts Library">
+    <div id="catalog-modal-panel">
+
+      <div id="catalog-modal-header">
+        <span id="catalog-modal-title">Standard Parts Library</span>
+        <button id="catalog-modal-close" class="modal-close-btn" title="Close (Esc)">✕</button>
+      </div>
+
+      <!-- Category tabs -->
+      <div id="catalog-tabs">
+        <button class="cat-btn active" data-cat="fastener">Fasteners</button>
+        <button class="cat-btn" data-cat="bearing">Bearings</button>
+        <button class="cat-btn" data-cat="shaft">Shaft &amp; Keys</button>
+        <button class="cat-btn" data-cat="profile">Profiles</button>
+      </div>
+
+      <div id="catalog-modal-body">
+
+        <!-- Left: icon grid -->
+        <div id="catalog-grid-pane">
+          <div id="catalog-grid"></div>
+        </div>
+
+        <!-- Right: configuration panel -->
+        <div id="catalog-config-pane">
+          <div id="catalog-config-empty">
+            <svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="1.5">
+              <circle cx="20" cy="14" r="8"/>
+              <path d="M9 36 C9 28 31 28 31 36"/>
+            </svg>
+            <p>Select a part</p>
+          </div>
+          <div id="catalog-config-panel" class="hidden">
+            <div id="config-part-name"></div>
+            <div id="catalog-config-fields">
+              <label class="cat-label">
+                <span class="cat-label-text">Size</span>
+                <select id="cat-size-sel"></select>
+              </label>
+              <label class="cat-label hidden" id="cat-length-row">
+                <span class="cat-label-text">Length (mm)</span>
+                <input id="cat-length-inp" type="number" min="1" step="1" value="20">
+              </label>
+            </div>
+            <table id="cat-dims-table"></table>
+            <div id="catalog-footer">
+              <span id="catalog-error" class="catalog-error hidden"></span>
+              <button id="catalog-insert-btn">Insert Part</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
 
   <!-- ── Code Modal ──────────────────────────────────────────────────────── -->
   <div id="code-modal" class="hidden" role="dialog" aria-modal="true" aria-label="Generated CadQuery code">
@@ -161,6 +219,6 @@
     </div>
   </div>
 
-  <script type="module" src="app.js?v=4"></script>
+  <script type="module" src="app.js?v=5"></script>
 </body>
 </html>
