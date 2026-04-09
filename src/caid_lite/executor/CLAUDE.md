@@ -8,6 +8,7 @@ The parent process is protected from crashes, segfaults, and infinite loops.
 - `sandbox.py` — `Sandbox`: spawns the runner, parses result, returns `ExecutionResult`
 - `runner_template.py` — copied to a temp dir and executed as a subprocess entry point
 - `result.py` — `ExecutionResult` dataclass (plain data; no subprocess logic)
+- `runner_import.py` — subprocess for importing user-supplied STEP/STL files
 
 ## Interface contract
 ```python
@@ -32,6 +33,17 @@ The runner enforces the `build_model()` contract before importing CadQuery:
 4. Check `isinstance(result, cq.Workplane)` — fail with type name if wrong.
 5. Export each format via `cq.exporters.export()`; catch per-format errors.
 6. Print a single JSON line to stdout; always exit 0.
+
+## runner_import.py contract
+Called by `SessionManager._run_import()` via `asyncio.to_thread`.
+```
+python runner_import.py <out_dir> <run_id> <source_path>
+```
+- STEP (`.step`/`.stp`): `cq.importers.importStep()` → validate → export STEP + STL
+- STL (`.stl`): `shutil.copy` to output dir only (no re-export)
+- JSON stdout: `{"success": bool, "step_path": str|null, "stl_path": str|null,
+                 "validation_metrics": {...}, "error": str|null}`
+- Always exits 0; errors reported via `success=False`.
 
 ## Architecture rules
 - `Sandbox` must not import `cadquery` — only the runner subprocess does.

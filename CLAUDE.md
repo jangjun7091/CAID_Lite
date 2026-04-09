@@ -9,18 +9,25 @@ drop-in backend.
 ```
 src/caid_lite/
   pipeline.py       # top-level orchestrator (Phase 1–3)
+  agents/           # multi-agent layer (ArchitectAgent, DesignerAgent, CriticAgent, …)
   llm/              # provider-agnostic LLM interface + backends
-  executor/         # subprocess sandbox (Phase 2)
-  validator/        # geometry checks (Phase 3)
-  repair/           # LLM-guided repair loop (Phase 3)
-  exporter/         # STEP/STL export helpers (future)
-  session/          # in-memory session state (Phase 4)
-  api/              # FastAPI routes + SSE (Phase 4)
+  executor/         # subprocess sandbox (Phase 2) + runner_import.py
+  validator/        # geometry checks (Phase 3) — stub
+  repair/           # LLM-guided repair loop (Phase 3) — stub
+  exporter/         # STEP/STL export helpers — future
+  session/          # in-memory session state + SSE fan-out (Phase 4)
+  assembly/         # multi-part assembly: models, pipeline, manager, runner
+  catalog/          # ISO standard parts: dimension data + CadQuery builders
+  api/              # FastAPI app + routes (server.py, routes/, deps.py)
   logging/          # structured console + JSONL logging
 tests/
   unit/             # no API key, no CadQuery required
   integration/      # real API / real CadQuery; @pytest.mark.integration
   fixtures/         # MockLLMBackend, MockSandbox, code fixtures
+gui/
+  static/           # index.html, app.js, style.css, assembly.html, app_assembly.js, assembly.css
+config/
+  default.yaml      # LLM provider, executor timeout, output dirs
 ```
 
 ## Architecture rules
@@ -28,7 +35,8 @@ tests/
 - All modules depend on **protocols / dataclasses**, not concrete implementations.
   - `CADPipeline` accepts `LLMBackend` (Protocol) and `Sandbox` (duck-typed).
   - No provider-specific imports outside `llm/providers/`.
-- Session state lives exclusively in `session/manager.py` (Phase 4+).
+- Session state lives exclusively in `session/manager.py`.
+- `AssemblyManager` shares the SSE channel via `emit_fn` injected from `SessionManager`.
 - `repair/loop.py` and `validator/geometry.py` are not yet implemented; stub files exist.
 
 ## Generated code contract
@@ -42,6 +50,7 @@ Every CadQuery script the LLM produces must:
 - `cadquery` is an optional extra (`pip install -e ".[cadquery]"`); import it only inside
   executor subprocess or `@requires_cq`-guarded tests.
 - `anthropic` is an optional extra; import only inside `llm/providers/anthropic_provider.py`.
+- `python-multipart` required for file upload routes.
 
 ## Testing rules
 - `pytest tests/unit/` must pass with **no API key and no CadQuery installed**.
