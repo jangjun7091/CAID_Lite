@@ -10,8 +10,8 @@
     {
       "name": "CAID Lite API (dev reload)",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["scripts/run_server.py", "--reload"],
-      "port": 8000
+      "runtimeArgs": ["scripts/run_server.py", "--port", "8001"],
+      "port": 8001
     }
   ]
 }

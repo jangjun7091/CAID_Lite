@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import uuid
+from pathlib import Path
 from typing import Any, Dict, List, Union
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
 from ..deps import get_manager
@@ -64,6 +66,55 @@ def delete_part(
     """Remove a part from the shelf."""
     if not manager.remove_part(part_id):
         raise HTTPException(status_code=404, detail=f"Part '{part_id}' not found.")
+
+
+@router.post("/parts/import", response_model=Dict[str, Any])
+async def import_part(
+    file: UploadFile = File(..., description="STEP (.step/.stp) or STL (.stl) file"),
+    manager: SessionManager = Depends(get_manager),
+) -> Dict[str, Any]:
+    """Import an existing STEP or STL file as a new part on the shelf.
+
+    The file is saved to a temporary upload directory, then processed in
+    a subprocess (geometry validation + normalised STEP+STL export).
+    Returns immediately with ``status="generating"``; track progress via SSE.
+    """
+    filename = file.filename or "upload"
+    ext = Path(filename).suffix.lower()
+    if ext in (".step", ".stp"):
+        fmt = "step"
+    elif ext == ".stl":
+        fmt = "stl"
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file type '{ext}'. Only STEP (.step/.stp) and STL (.stl) are accepted.",
+        )
+
+    # Save upload to a stable path so the subprocess can read it
+    upload_dir = manager._pipeline._sandbox.output_dir / "_uploads"
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    tmp_name = f"{uuid.uuid4().hex}{ext}"
+    save_path = upload_dir / tmp_name
+    content = await file.read()
+    save_path.write_bytes(content)
+
+    # Derive display name from filename (strip extension)
+    name = Path(filename).stem
+
+    try:
+        part_id = await manager.import_file(
+            source_path=str(save_path),
+            name=name,
+            source_format=fmt,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+    part = manager.get_part(part_id)
+    if part is None:
+        raise HTTPException(status_code=500, detail="Part creation failed unexpectedly.")
+    return part.to_dict()
 
 
 @router.post("/parts/{part_id}/refine", response_model=Dict[str, Any])

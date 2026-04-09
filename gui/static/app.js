@@ -1098,6 +1098,49 @@ function escHtml(str) {
     .replace(/"/g, "&quot;");
 }
 
+// ── File Import ───────────────────────────────────────────────────────────────
+
+document.getElementById("import-file-btn").addEventListener("click", () => {
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = ".step,.stp,.stl";
+  input.onchange = async () => {
+    const file = input.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    // Show immediate feedback in chat
+    appendStatusMsg(`Importing "${file.name}"…`);
+
+    try {
+      const r = await fetch("/api/parts/import", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        appendStatusMsg(`Import failed: ${err.detail || r.statusText}`, "error");
+        return;
+      }
+
+      const data = await r.json();
+      // Add to shelf immediately with "generating" status
+      state.parts[data.id] = data;
+      renderShelf();
+      if (!state.activePart) {
+        state.activePart = data.id;
+        showPlaceholder("Importing file…");
+      }
+    } catch (err) {
+      appendStatusMsg(`Import error: ${err.message}`, "error");
+    }
+  };
+  input.click();
+});
+
 // ── Boot ──────────────────────────────────────────────────────────────────────
 connectSSE();
 initCatalog();

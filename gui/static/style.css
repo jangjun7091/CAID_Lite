@@ -33,10 +33,24 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
   border-bottom: 1px solid var(--border);
 }
 .app-title { font-weight: 600; font-size: 15px; letter-spacing: .02em; }
+#assembly-page-btn {
+  margin-left: auto;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--radius);
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background .15s, border-color .15s;
+}
+#assembly-page-btn:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
+
 .status-dot {
   width: 8px; height: 8px; border-radius: 50%; background: var(--text-dim);
   transition: background .3s;
-  margin-left: auto;
 }
 .status-dot.connected    { background: var(--green); }
 .status-dot.disconnected { background: var(--red); }
@@ -58,10 +72,23 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
   overflow: hidden;
 }
 .shelf-header {
-  padding: 12px 14px;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px;
   border-bottom: 1px solid var(--border);
 }
 .shelf-header h2 { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--text-dim); }
+
+.shelf-import-btn {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  border-radius: var(--radius);
+  padding: 3px 8px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.shelf-import-btn:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
 
 #parts-list {
   list-style: none;

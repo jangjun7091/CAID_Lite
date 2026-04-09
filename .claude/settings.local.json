@@ -47,7 +47,8 @@
       "Bash(grep -r \"phase\\\\|Phase\" C:UsersJJHCAID_Lite --include=*.md --include=*.txt)",
       "Bash(find C:UsersJJH.claude -type f -name *.md -o -name *.txt)",
       "Bash(find C:UsersJJHCAID_Lite -type f \\\\\\(-name *.sh -o -name Makefile -o -name docker-compose.yml -o -name .env.example \\\\\\))",
-      "mcp__Claude_Preview__preview_start"
+      "mcp__Claude_Preview__preview_start",
+      "Bash(python -c ':*)"
     ]
   }
 }

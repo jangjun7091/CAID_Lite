@@ -217,6 +217,127 @@ class SessionManager:
         return part_id
 
     # ------------------------------------------------------------------
+    # File import (STEP / STL)
+    # ------------------------------------------------------------------
+
+    async def import_file(
+        self,
+        source_path: str,
+        name: str,
+        source_format: str,
+    ) -> str:
+        """Import an existing STEP or STL file as a new PartEntry.
+
+        Runs ``runner_import.py`` in a subprocess to validate the geometry
+        and re-export normalised STEP + STL files into the outputs directory.
+        Emits the same SSE events as a normal generation run.
+
+        Args:
+            source_path:   Absolute path to the uploaded file.
+            name:          Display name for the part.
+            source_format: ``"step"`` or ``"stl"``.
+
+        Returns:
+            The UUID string of the newly created ``PartEntry``.
+        """
+        part_id = str(uuid.uuid4())
+        part = PartEntry(
+            id=part_id,
+            name=name,
+            prompt=f"[imported {source_format.upper()}] {name}",
+            status="generating",
+            created_at=datetime.now(timezone.utc),
+        )
+        self._state.add_part(part)
+        self.emit("part.status_changed", {"id": part_id, "status": "generating"})
+        asyncio.create_task(self._run_import(part, source_path, source_format))
+        return part_id
+
+    async def _run_import(
+        self, part: PartEntry, source_path: str, source_format: str
+    ) -> None:
+        """Background task: run runner_import.py subprocess."""
+        import json as _json
+        import shutil
+        import subprocess
+        import sys
+        import tempfile
+        import time
+
+        from pathlib import Path as _Path
+
+        _RUNNER_IMPORT = (
+            _Path(__file__).resolve().parent.parent / "executor" / "runner_import.py"
+        )
+
+        run_out_dir = self._pipeline._sandbox.output_dir / part.id
+        run_out_dir.mkdir(parents=True, exist_ok=True)
+
+        timeout_s = self._pipeline._sandbox.timeout_s
+
+        with tempfile.TemporaryDirectory(prefix="caid_import_") as _tmp:
+            tmp_dir = _Path(_tmp)
+            runner_path = tmp_dir / "_runner_import.py"
+            shutil.copy2(_RUNNER_IMPORT, runner_path)
+
+            cmd = [
+                sys.executable,
+                str(runner_path),
+                str(run_out_dir),
+                part.id,
+                source_path,
+                source_format,
+            ]
+
+            start = time.monotonic()
+            try:
+                proc = await asyncio.to_thread(
+                    subprocess.run,
+                    cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    timeout=timeout_s,
+                )
+            except Exception as exc:
+                part.error = str(exc)
+                part.status = "failed"
+                self.emit("part.failed", part.to_dict())
+                return
+
+        stdout = proc.stdout.strip()
+        if not stdout:
+            part.error = "Import runner produced no output."
+            part.status = "failed"
+            self.emit("part.failed", part.to_dict())
+            return
+
+        try:
+            data = _json.loads(stdout)
+        except _json.JSONDecodeError:
+            part.error = f"Non-JSON output from import runner: {stdout[:200]}"
+            part.status = "failed"
+            self.emit("part.failed", part.to_dict())
+            return
+
+        if data.get("success"):
+            exports: dict = {}
+            if data.get("step_path"):
+                exports["step"] = data["step_path"]
+            if data.get("stl_path"):
+                exports["stl"] = data["stl_path"]
+            part.exports = exports
+            part.validation = data.get("validation_metrics")
+            part.status = "ready"
+            self.emit("part.ready", part.to_dict())
+            _log.info(f"[{part.id[:8]}] Imported '{part.name}' ({source_format.upper()})")
+        else:
+            part.error = data.get("exception") or "Import failed."
+            part.status = "failed"
+            self.emit("part.failed", part.to_dict())
+            _log.warning(f"[{part.id[:8]}] Import failed: {part.error}")
+
+    # ------------------------------------------------------------------
     # Standard catalog parts (no LLM)
     # ------------------------------------------------------------------
 

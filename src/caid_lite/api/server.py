@@ -23,13 +23,24 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request as StarletteRequest
 
+from ..assembly.manager import AssemblyManager
+from ..assembly.pipeline import AssemblyPipeline
 from ..pipeline import CADPipeline
 from ..session.manager import SessionManager
-from .routes import catalog, chat, events, parts, workspace
+from .routes import assembly, catalog, chat, events, parts, workspace
 
 # Resolve GUI static directory relative to this file (works whether installed
 # or run in-place from the project root).
 _STATIC_DIR = Path(__file__).resolve().parent.parent.parent.parent / "gui" / "static"
+
+
+def _load_yaml_config(config_path: str | Path) -> dict:
+    """Load and return the raw YAML config dict."""
+    import yaml
+    path = Path(config_path)
+    if not path.is_file():
+        return {}
+    return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
 
 
 class _NoCacheJsCss(BaseHTTPMiddleware):
@@ -59,15 +70,25 @@ def create_app(config_path: str | Path = "config/default.yaml") -> FastAPI:
         Configured ``FastAPI`` instance with all routes mounted.
     """
     manager: SessionManager | None = None
+    asm_manager: AssemblyManager | None = None
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        nonlocal manager
+        nonlocal manager, asm_manager
         pipeline = CADPipeline.from_config(config_path)
         manager = SessionManager(pipeline=pipeline)
+        asm_pipeline = AssemblyPipeline.from_config(
+            _load_yaml_config(config_path)
+        )
+        asm_manager = AssemblyManager(
+            pipeline=asm_pipeline,
+            session_manager=manager,
+            llm=pipeline._llm,
+        )
         app.state.manager = manager
+        app.state.asm_manager = asm_manager
         yield
-        # Nothing to clean up — pipeline is stateless
+        # Nothing to clean up — pipelines are stateless
 
     app = FastAPI(
         title="CAID Lite",
@@ -89,12 +110,19 @@ def create_app(config_path: str | Path = "config/default.yaml") -> FastAPI:
     app.include_router(workspace.router, prefix="/api")
     app.include_router(events.router, prefix="/api")
     app.include_router(catalog.router, prefix="/api")
+    app.include_router(assembly.router, prefix="/api")
 
     # Serve the GUI static files.  Mount last so API routes take priority.
     if _STATIC_DIR.is_dir():
+        _NO_CACHE = {"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache"}
+
         @app.get("/")
         async def serve_index() -> FileResponse:
-            return FileResponse(_STATIC_DIR / "index.html")
+            return FileResponse(_STATIC_DIR / "index.html", headers=_NO_CACHE)
+
+        @app.get("/assembly")
+        async def serve_assembly() -> FileResponse:
+            return FileResponse(_STATIC_DIR / "assembly.html", headers=_NO_CACHE)
 
         app.mount("/", StaticFiles(directory=str(_STATIC_DIR)), name="static")
 

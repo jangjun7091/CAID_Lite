@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CAID Assembly</title>
+  <link rel="stylesheet" href="style.css?v=5">
+  <link rel="stylesheet" href="assembly.css?v=3">
+
+  <!-- Three.js r160 via ESM import map -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <header id="app-header">
+    <a href="/" class="app-title" style="text-decoration:none;color:inherit;">← CAID Lite</a>
+    <span class="app-title-sep">|</span>
+    <span class="app-title">Assembly</span>
+    <span id="conn-status" class="status-dot" title="Connecting…"></span>
+  </header>
+
+  <main class="asm-workspace">
+
+    <!-- ── Left: Parts Shelf ──────────────────────────────────────────── -->
+    <aside id="asm-shelf">
+      <div class="shelf-header">
+        <h2>Parts Shelf</h2>
+        <div class="shelf-header-actions">
+          <button id="asm-new-btn" class="shelf-action-btn" title="New Assembly">+ New</button>
+        </div>
+      </div>
+
+      <!-- Assembly selector -->
+      <div id="asm-selector-row">
+        <select id="asm-select" title="Active assembly"></select>
+        <button id="asm-delete-btn" class="icon-btn danger" title="Delete assembly">✕</button>
+      </div>
+      <div id="asm-selector-empty" class="shelf-empty hidden">No assemblies. Click "+ New" to start.</div>
+
+      <!-- Parts in the active assembly -->
+      <div class="shelf-section-header">
+        <span>Assembly Parts</span>
+        <button id="add-shelf-part-btn" class="shelf-action-btn" title="Add part from shelf">+ Shelf</button>
+        <button id="add-catalog-part-btn" class="shelf-action-btn" title="Add catalog part">+ Catalog</button>
+        <button id="upload-step-btn" class="shelf-action-btn" title="Upload STEP file">+ STEP</button>
+      </div>
+      <ul id="asm-parts-list">
+        <li class="shelf-empty">No parts in this assembly.</li>
+      </ul>
+
+      <!-- Generated parts available on shelf -->
+      <div class="shelf-section-header">
+        <span>Available (Shelf)</span>
+      </div>
+      <ul id="shelf-available-list">
+        <li class="shelf-empty">No ready parts on shelf.</li>
+      </ul>
+    </aside>
+
+    <!-- ── Center: 3D Assembly Viewport ──────────────────────────────── -->
+    <section id="asm-viewport">
+      <div id="asm-viewport-placeholder">
+        <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="8" y="16" width="48" height="36" rx="2"/>
+          <path d="M8 28 L32 20 L56 28"/>
+          <path d="M32 20 L32 52"/>
+          <circle cx="44" cy="40" r="6"/>
+        </svg>
+        <p>Add parts and click Solve to preview the assembly</p>
+      </div>
+
+      <canvas id="asm-canvas"></canvas>
+
+      <!-- View toolbar -->
+      <div id="asm-view-toolbar">
+        <button class="view-btn" data-view="iso">Iso</button>
+        <button class="view-btn" data-view="front">Front</button>
+        <button class="view-btn" data-view="top">Top</button>
+        <button class="view-btn" data-view="right">Right</button>
+        <span class="toolbar-sep"></span>
+        <button id="asm-wireframe-btn" class="view-btn" title="Toggle wireframe (W)">Wire</button>
+        <button id="asm-explode-btn"   class="view-btn" title="Explode view">Explode</button>
+      </div>
+
+      <!-- Axis gizmo -->
+      <canvas id="asm-gizmo-canvas" title="Orientation gizmo (X=red, Y=green, Z=blue)"></canvas>
+
+      <!-- Status overlay -->
+      <div id="asm-status-overlay" class="hidden">
+        <span id="asm-status-text">Solving…</span>
+      </div>
+
+      <!-- Solve bar -->
+      <div id="asm-action-bar">
+        <span id="asm-result-info"></span>
+        <button id="asm-solve-btn" class="primary-btn">Solve Assembly</button>
+        <a id="asm-download-step" class="dl-btn hidden" title="Download assembled STEP">
+          <svg viewBox="0 0 16 16" fill="currentColor">
+            <path d="M8 12l-4-4h2.5V3h3v5H12L8 12z"/>
+            <rect x="2" y="13" width="12" height="1.5" rx=".75"/>
+          </svg>
+          STEP
+        </a>
+        <a id="asm-download-stl" class="dl-btn hidden" title="Download assembled STL">
+          <svg viewBox="0 0 16 16" fill="currentColor">
+            <path d="M8 12l-4-4h2.5V3h3v5H12L8 12z"/>
+            <rect x="2" y="13" width="12" height="1.5" rx=".75"/>
+          </svg>
+          STL
+        </a>
+      </div>
+    </section>
+
+    <!-- ── Right: Constraints Panel ──────────────────────────────────── -->
+    <aside id="constraints-panel">
+      <div class="shelf-header">
+        <h2>Constraints</h2>
+      </div>
+
+      <!-- Constraint list -->
+      <ul id="constraints-list">
+        <li class="shelf-empty">No constraints yet.</li>
+      </ul>
+
+      <!-- Face-pick interaction -->
+      <div id="face-pick-panel">
+        <div class="form-section-title">Add Constraint</div>
+
+        <div class="face-pick-controls">
+          <label class="form-label-inline">
+            <span>Type</span>
+            <select id="con-type-auto">
+              <option value="auto">Auto</option>
+              <option value="Plane">Plane</option>
+              <option value="Axis">Axis</option>
+              <option value="Point">Point</option>
+              <option value="Fixed">Fixed (world)</option>
+              <option value="FixedPlane">FixedPlane</option>
+              <option value="FixedAxis">FixedAxis</option>
+            </select>
+          </label>
+          <label class="form-label-inline">
+            <span>Offset (mm)</span>
+            <input id="con-param-auto" type="number" value="0" step="0.1">
+          </label>
+        </div>
+
+        <div id="face-pick-status">
+          <span id="face-pick-step">① Click a face on any part</span>
+          <button id="face-pick-cancel" class="cancel-btn hidden">✕ Cancel</button>
+        </div>
+
+        <div id="con-form-error" class="form-error hidden"></div>
+      </div>
+
+      <!-- NL constraint input (Phase 2) -->
+      <div id="nl-constraint-section">
+        <div class="form-section-title">Natural Language</div>
+        <textarea
+          id="nl-constraint-input"
+          placeholder="e.g. Fix shaft to world, then place bearing coaxially on shaft"
+          rows="3"
+        ></textarea>
+        <button id="nl-constraint-btn" class="primary-btn">Parse &amp; Add</button>
+        <div id="nl-constraint-status" class="hidden"></div>
+      </div>
+    </aside>
+
+  </main>
+
+  <!-- ── Modals ─────────────────────────────────────────────────────────────── -->
+
+  <!-- Shelf part picker modal -->
+  <div id="shelf-picker-modal" class="modal-overlay hidden">
+    <div class="modal-panel">
+      <div class="modal-header">
+        <span>Select Part from Shelf</span>
+        <button class="modal-close-btn" data-modal="shelf-picker-modal">✕</button>
+      </div>
+      <ul id="shelf-picker-list" class="picker-list"></ul>
+    </div>
+  </div>
+
+  <!-- Catalog modal (re-used via inline iframe of /api/catalog endpoint) -->
+  <div id="catalog-picker-modal" class="modal-overlay hidden">
+    <div class="modal-panel catalog-modal-panel">
+      <div class="modal-header">
+        <span>Standard Parts Library</span>
+        <button class="modal-close-btn" data-modal="catalog-picker-modal">✕</button>
+      </div>
+      <div id="catalog-picker-body">
+        <!-- Category tabs -->
+        <div id="cp-tabs">
+          <button class="cat-btn active" data-cat="fastener">Fasteners</button>
+          <button class="cat-btn" data-cat="bearing">Bearings</button>
+          <button class="cat-btn" data-cat="shaft">Shaft &amp; Keys</button>
+          <button class="cat-btn" data-cat="profile">Profiles</button>
+        </div>
+        <div id="cp-grid-pane">
+          <div id="cp-grid"></div>
+        </div>
+        <div id="cp-config-pane">
+          <div id="cp-config-empty">
+            <p>Select a part type</p>
+          </div>
+          <div id="cp-config-panel" class="hidden">
+            <div id="cp-part-name"></div>
+            <label class="cat-label">
+              <span class="cat-label-text">Size</span>
+              <select id="cp-size-sel"></select>
+            </label>
+            <label class="cat-label hidden" id="cp-length-row">
+              <span class="cat-label-text">Length (mm)</span>
+              <input id="cp-length-inp" type="number" min="1" step="1" value="20">
+            </label>
+            <table id="cp-dims-table"></table>
+            <div id="cp-footer">
+              <span id="cp-error" class="catalog-error hidden"></span>
+              <button id="cp-insert-btn">Generate &amp; Add to Assembly</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="app_assembly.js?v=3"></script>
+</body>
+</html>
